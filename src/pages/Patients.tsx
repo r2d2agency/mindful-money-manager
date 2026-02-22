@@ -1,21 +1,32 @@
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { useEffect, useState, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { fetchPatients, createPatient, updatePatient, deletePatient, fetchPsychologists } from "@/lib/api";
-import { formatDate } from "@/lib/format";
-import { Plus, Pencil, Trash2, Search, Loader2 } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  fetchPatients, createPatient, updatePatient, deletePatient,
+  fetchPsychologists, fetchSessions, fetchInvoices
+} from "@/lib/api";
+import { formatDate, formatCurrency } from "@/lib/format";
+import { Plus, Pencil, Trash2, Search, Loader2, Eye, FileText, Calendar, DollarSign } from "lucide-react";
 import { toast } from "sonner";
-import { Patient, Psychologist } from "@/types";
+import { Patient, Psychologist, Session, Invoice } from "@/types";
+
+const statusLabels: Record<string, string> = { scheduled: "Agendada", completed: "Realizada", cancelled: "Cancelada" };
+const paymentLabels: Record<string, string> = { pending: "Pendente", paid: "Pago", partial: "Parcial" };
 
 export default function Patients() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [psychologists, setPsychologists] = useState<Psychologist[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -23,9 +34,12 @@ export default function Patients() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", psychologistId: "", notes: "" });
 
+  // Patient detail sheet
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+
   useEffect(() => {
-    Promise.all([fetchPatients(), fetchPsychologists()])
-      .then(([p, psy]) => { setPatients(p); setPsychologists(psy); })
+    Promise.all([fetchPatients(), fetchPsychologists(), fetchSessions(), fetchInvoices()])
+      .then(([p, psy, s, inv]) => { setPatients(p); setPsychologists(psy); setSessions(s); setInvoices(inv); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -33,6 +47,25 @@ export default function Patients() {
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.email.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Data for selected patient
+  const patientSessions = useMemo(() => {
+    if (!selectedPatient) return [];
+    return sessions.filter(s => s.patientId === selectedPatient.id).sort((a, b) => b.date.localeCompare(a.date));
+  }, [selectedPatient, sessions]);
+
+  const patientInvoices = useMemo(() => {
+    if (!selectedPatient) return [];
+    return invoices.filter(inv => inv.patientId === selectedPatient.id).sort((a, b) => b.date.localeCompare(a.date));
+  }, [selectedPatient, invoices]);
+
+  const patientStats = useMemo(() => {
+    const total = patientSessions.filter(s => s.status !== "cancelled").length;
+    const received = patientSessions.filter(s => s.paymentStatus === "paid").reduce((sum, s) => sum + s.paidAmount, 0);
+    const pending = patientSessions.filter(s => s.paymentStatus !== "paid" && s.status !== "cancelled").reduce((sum, s) => sum + s.expectedAmount - s.paidAmount, 0);
+    const invoiceTotal = patientInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+    return { total, received, pending, invoiceTotal, invoiceCount: patientInvoices.length };
+  }, [patientSessions, patientInvoices]);
 
   function openNew() {
     setEditing(null);
@@ -131,7 +164,7 @@ export default function Patients() {
                 <TableHead>Telefone</TableHead>
                 <TableHead>Psicólogo</TableHead>
                 <TableHead>Cadastro</TableHead>
-                <TableHead className="w-[100px]">Ações</TableHead>
+                <TableHead className="w-[130px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -145,6 +178,9 @@ export default function Patients() {
                   <TableCell>{formatDate(p.createdAt)}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => setSelectedPatient(p)} title="Ver ficha">
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>
@@ -155,6 +191,129 @@ export default function Patients() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Patient Detail Sheet */}
+      <Sheet open={!!selectedPatient} onOpenChange={(open) => !open && setSelectedPatient(null)}>
+        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+          {selectedPatient && (
+            <>
+              <SheetHeader>
+                <SheetTitle className="text-xl">{selectedPatient.name}</SheetTitle>
+                <div className="text-sm text-muted-foreground space-y-0.5">
+                  {selectedPatient.phone && <p>📱 {selectedPatient.phone}</p>}
+                  {selectedPatient.email && <p>✉️ {selectedPatient.email}</p>}
+                  <p>Psicólogo: {getPsyName(selectedPatient.psychologistId)}</p>
+                  {selectedPatient.notes && <p className="italic mt-1">{selectedPatient.notes}</p>}
+                </div>
+              </SheetHeader>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-3 mt-6">
+                <Card>
+                  <CardContent className="pt-4 pb-3 px-3 text-center">
+                    <Calendar className="h-4 w-4 mx-auto text-muted-foreground mb-1" />
+                    <div className="text-lg font-bold">{patientStats.total}</div>
+                    <p className="text-xs text-muted-foreground">Sessões</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4 pb-3 px-3 text-center">
+                    <DollarSign className="h-4 w-4 mx-auto text-success mb-1" />
+                    <div className="text-lg font-bold text-success">{formatCurrency(patientStats.received)}</div>
+                    <p className="text-xs text-muted-foreground">Recebido</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4 pb-3 px-3 text-center">
+                    <DollarSign className="h-4 w-4 mx-auto text-warning mb-1" />
+                    <div className="text-lg font-bold text-warning">{formatCurrency(patientStats.pending)}</div>
+                    <p className="text-xs text-muted-foreground">Pendente</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Tabs defaultValue="sessions" className="mt-6">
+                <TabsList className="w-full">
+                  <TabsTrigger value="sessions" className="flex-1">
+                    <Calendar className="mr-1 h-3 w-3" />Sessões ({patientSessions.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="invoices" className="flex-1">
+                    <FileText className="mr-1 h-3 w-3" />Notas ({patientInvoices.length})
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="sessions" className="mt-3">
+                  {patientSessions.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-6 text-sm">Nenhuma sessão registrada</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {patientSessions.map(s => (
+                        <div key={s.id} className="flex items-center justify-between p-3 rounded-lg border bg-card text-sm">
+                          <div className="space-y-0.5">
+                            <div className="font-medium">
+                              {formatDate(s.date)}
+                              {s.time && <span className="text-muted-foreground ml-2">{s.time}</span>}
+                              {s.duration && <span className="text-muted-foreground ml-1">· {s.duration}min</span>}
+                            </div>
+                            <div className="flex gap-2">
+                              <Badge variant={s.status === "completed" ? "default" : s.status === "cancelled" ? "destructive" : "secondary"} className="text-xs">
+                                {statusLabels[s.status]}
+                              </Badge>
+                              <Badge
+                                variant={s.paymentStatus === "paid" ? "default" : "outline"}
+                                className={`text-xs ${s.paymentStatus === "paid" ? "bg-success text-success-foreground" : ""}`}
+                              >
+                                {paymentLabels[s.paymentStatus]}
+                              </Badge>
+                            </div>
+                            {s.notes && <p className="text-xs text-muted-foreground italic">{s.notes}</p>}
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold">{formatCurrency(s.expectedAmount)}</div>
+                            {s.paidAmount > 0 && s.paidAmount !== s.expectedAmount && (
+                              <div className="text-xs text-muted-foreground">Pago: {formatCurrency(s.paidAmount)}</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="invoices" className="mt-3">
+                  {patientInvoices.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-6 text-sm">Nenhuma nota emitida</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {patientInvoices.map(inv => (
+                        <div key={inv.id} className="p-3 rounded-lg border bg-card text-sm space-y-1">
+                          <div className="flex items-center justify-between">
+                            <div className="font-medium flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-primary" />
+                              {formatDate(inv.date)}
+                            </div>
+                            <div className="font-semibold text-primary">{formatCurrency(inv.amount)}</div>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {inv.sessionIds?.length || 0} sessão(ões) vinculada(s)
+                          </div>
+                          {inv.notes && (
+                            <p className="text-xs text-muted-foreground italic border-t pt-1 mt-1">{inv.notes}</p>
+                          )}
+                        </div>
+                      ))}
+                      <div className="pt-2 border-t mt-3 flex justify-between text-sm font-medium">
+                        <span>Total em Notas</span>
+                        <span className="text-primary">{formatCurrency(patientStats.invoiceTotal)}</span>
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
