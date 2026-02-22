@@ -12,10 +12,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   fetchPatients, createPatient, updatePatient, deletePatient,
-  fetchPsychologists, fetchSessions, fetchInvoices
+  fetchPsychologists, fetchSessions, fetchInvoices, createInvoice
 } from "@/lib/api";
 import { formatDate, formatCurrency } from "@/lib/format";
-import { Plus, Pencil, Trash2, Search, Loader2, Eye, FileText, Calendar, DollarSign, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Loader2, Eye, FileText, Calendar, DollarSign, Download, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Patient, Psychologist, Session, Invoice } from "@/types";
 
@@ -281,6 +281,43 @@ export default function Patients() {
                 </TabsContent>
 
                 <TabsContent value="invoices" className="mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mb-3"
+                    onClick={() => {
+                      const input = document.createElement("input");
+                      input.type = "file";
+                      input.accept = "image/*,.pdf";
+                      input.onchange = async (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (!file) return;
+                        if (file.size > 2 * 1024 * 1024) { toast.error("Arquivo deve ter no máximo 2MB"); return; }
+                        const reader = new FileReader();
+                        reader.onload = async () => {
+                          try {
+                            await createInvoice({
+                              patientId: selectedPatient!.id,
+                              psychologistId: selectedPatient!.psychologistId,
+                              amount: 0,
+                              date: new Date().toISOString().split("T")[0],
+                              sessionIds: [],
+                              notes: `Nota fiscal: ${file.name}`,
+                              fileData: reader.result as string,
+                              fileName: file.name,
+                            });
+                            const inv = await fetchInvoices();
+                            setInvoices(inv);
+                            toast.success(`Nota "${file.name}" vinculada ao paciente`);
+                          } catch (err: any) { toast.error(err.message); }
+                        };
+                        reader.readAsDataURL(file);
+                      };
+                      input.click();
+                    }}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />Subir Nota Fiscal
+                  </Button>
                   {patientInvoices.length === 0 ? (
                     <p className="text-center text-muted-foreground py-6 text-sm">Nenhuma nota emitida</p>
                   ) : (
