@@ -46,8 +46,8 @@ export default function Sessions() {
   const [invoiceForm, setInvoiceForm] = useState({ patientId: "", amount: "", date: new Date().toISOString().split("T")[0], notes: "" });
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
 
-  const [form, setForm] = useState({ patientId: "", psychologistId: "", date: "", expectedAmount: "", notes: "" });
-  const [recurringForm, setRecurringForm] = useState({ patientId: "", psychologistId: "", dayOfWeek: "1", time: "09:00", amount: "" });
+  const [form, setForm] = useState({ patientId: "", psychologistId: "", date: "", time: "", duration: "50", expectedAmount: "", notes: "" });
+  const [recurringForm, setRecurringForm] = useState({ patientId: "", psychologistId: "", amount: "", schedules: [{ dayOfWeek: 1, time: "09:00" }] as { dayOfWeek: number; time: string }[] });
 
   async function loadAll() {
     setLoading(true);
@@ -93,34 +93,37 @@ export default function Sessions() {
     try {
       await createSession({
         patientId: form.patientId, psychologistId: form.psychologistId, date: form.date,
+        time: form.time, duration: parseInt(form.duration) || 50,
         status: "scheduled", paymentStatus: "pending", expectedAmount: parseFloat(form.expectedAmount),
         paidAmount: 0, isRecurring: false, notes: form.notes,
       });
       setSessions(await fetchSessions());
       setDialogOpen(false);
-      setForm({ patientId: "", psychologistId: "", date: "", expectedAmount: "", notes: "" });
+      setForm({ patientId: "", psychologistId: "", date: "", time: "", duration: "50", expectedAmount: "", notes: "" });
       toast.success("Sessão agendada");
     } catch (err: any) { toast.error(err.message); }
     finally { setSaving(false); }
   }
 
   async function handleSaveRecurring() {
-    if (!recurringForm.patientId || !recurringForm.amount) { toast.error("Preencha os campos obrigatórios"); return; }
+    if (!recurringForm.patientId || !recurringForm.amount || recurringForm.schedules.length === 0) { toast.error("Preencha os campos obrigatórios"); return; }
     setSaving(true);
     try {
-      const plan = await createRecurringPlan({
+      const result = await createRecurringPlan({
         patientId: recurringForm.patientId,
         psychologistId: recurringForm.psychologistId,
-        dayOfWeek: parseInt(recurringForm.dayOfWeek),
-        time: recurringForm.time,
+        schedules: recurringForm.schedules,
         amount: parseFloat(recurringForm.amount),
-        active: true,
-      });
-      await generateRecurringSessions(plan.id, 8);
+      } as any);
+      // Generate sessions for each plan created
+      const plans = Array.isArray(result) ? result : [result];
+      for (const plan of plans) {
+        await generateRecurringSessions(plan.id, 8);
+      }
       await loadAll();
       setRecurringDialogOpen(false);
-      setRecurringForm({ patientId: "", psychologistId: "", dayOfWeek: "1", time: "09:00", amount: "" });
-      toast.success("Plano recorrente criado e sessões geradas para 8 semanas");
+      setRecurringForm({ patientId: "", psychologistId: "", amount: "", schedules: [{ dayOfWeek: 1, time: "09:00" }] });
+      toast.success(`Plano recorrente criado (${plans.length} dia${plans.length > 1 ? "s" : ""}) e sessões geradas para 8 semanas`);
     } catch (err: any) { toast.error(err.message); }
     finally { setSaving(false); }
   }
@@ -229,24 +232,45 @@ export default function Sessions() {
                     </Select>
                   </div>
                 )}
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <Label>Dia da Semana *</Label>
-                    <Select value={recurringForm.dayOfWeek} onValueChange={v => setRecurringForm(f => ({ ...f, dayOfWeek: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{DAYS_OF_WEEK.map((d, i) => (<SelectItem key={i} value={String(i)}>{d}</SelectItem>))}</SelectContent>
-                    </Select>
+                <div>
+                  <Label>Valor por Sessão *</Label>
+                  <Input type="number" value={recurringForm.amount} onChange={e => setRecurringForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Dias e Horários *</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setRecurringForm(f => ({ ...f, schedules: [...f.schedules, { dayOfWeek: 1, time: "09:00" }] }))}>
+                      <Plus className="mr-1 h-3 w-3" />Adicionar Dia
+                    </Button>
                   </div>
-                  <div>
-                    <Label>Horário</Label>
-                    <Input type="time" value={recurringForm.time} onChange={e => setRecurringForm(f => ({ ...f, time: e.target.value }))} />
-                  </div>
-                  <div>
-                    <Label>Valor *</Label>
-                    <Input type="number" value={recurringForm.amount} onChange={e => setRecurringForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
+                  <div className="space-y-2">
+                    {recurringForm.schedules.map((sched, idx) => (
+                      <div key={idx} className="flex gap-2 items-center">
+                        <Select value={String(sched.dayOfWeek)} onValueChange={v => {
+                          const updated = [...recurringForm.schedules];
+                          updated[idx] = { ...updated[idx], dayOfWeek: parseInt(v) };
+                          setRecurringForm(f => ({ ...f, schedules: updated }));
+                        }}>
+                          <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                          <SelectContent>{DAYS_OF_WEEK.map((d, i) => (<SelectItem key={i} value={String(i)}>{d}</SelectItem>))}</SelectContent>
+                        </Select>
+                        <Input type="time" value={sched.time} className="w-[120px]" onChange={e => {
+                          const updated = [...recurringForm.schedules];
+                          updated[idx] = { ...updated[idx], time: e.target.value };
+                          setRecurringForm(f => ({ ...f, schedules: updated }));
+                        }} />
+                        {recurringForm.schedules.length > 1 && (
+                          <Button type="button" variant="ghost" size="icon" className="shrink-0" onClick={() => {
+                            setRecurringForm(f => ({ ...f, schedules: f.schedules.filter((_, i) => i !== idx) }));
+                          }}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">Serão geradas sessões automaticamente para as próximas 8 semanas.</p>
+                <p className="text-xs text-muted-foreground">Serão geradas sessões automaticamente para as próximas 8 semanas em cada dia selecionado.</p>
                 <Button onClick={handleSaveRecurring} className="w-full" disabled={saving}>
                   {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Criar Plano e Gerar Sessões
                 </Button>
@@ -320,6 +344,10 @@ export default function Sessions() {
                 )}
                 <div className="grid grid-cols-2 gap-4">
                   <div><Label>Data *</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
+                  <div><Label>Horário</Label><Input type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><Label>Duração (min)</Label><Input type="number" value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} placeholder="50" /></div>
                   <div><Label>Valor Previsto *</Label><Input type="number" value={form.expectedAmount} onChange={e => setForm(f => ({ ...f, expectedAmount: e.target.value }))} placeholder="0.00" /></div>
                 </div>
                 <div><Label>Observações</Label><Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} /></div>
@@ -411,14 +439,15 @@ export default function Sessions() {
                             {daySessions.slice(0, 3).map(s => (
                               <div key={s.id}
                                 className={`text-[10px] truncate px-1 rounded cursor-pointer ${
-                                  s.paymentStatus === "paid" ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" :
-                                  s.status === "cancelled" ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" :
-                                  "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                                  s.paymentStatus === "paid" ? "bg-success/20 text-success" :
+                                  s.status === "cancelled" ? "bg-destructive/20 text-destructive" :
+                                  "bg-primary/15 text-primary"
                                 }`}
                                 onClick={() => s.paymentStatus !== "paid" && openPayDialog(s)}
-                                title={`${getPatientName(s.patientId)} - ${formatCurrency(s.expectedAmount)}`}
+                                title={`${getPatientName(s.patientId)} - ${s.time || ""} ${s.duration ? s.duration + "min" : ""} - ${formatCurrency(s.expectedAmount)}`}
                               >
-                                {getPatientName(s.patientId)}
+                                {s.time ? <span className="font-semibold">{s.time}</span> : null}
+                                {s.time ? " " : ""}{getPatientName(s.patientId)}
                               </div>
                             ))}
                             {daySessions.length > 3 && (
@@ -432,9 +461,9 @@ export default function Sessions() {
                 })}
               </div>
               <div className="flex gap-4 mt-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-100 dark:bg-blue-900/30" /> Agendada</span>
-                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-100 dark:bg-green-900/30" /> Paga</span>
-                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 dark:bg-red-900/30" /> Cancelada</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-primary/15" /> Agendada</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-success/20" /> Paga</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-destructive/20" /> Cancelada</span>
               </div>
             </CardContent>
           </Card>
@@ -447,17 +476,20 @@ export default function Sessions() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Data</TableHead><TableHead>Paciente</TableHead><TableHead>Psicólogo</TableHead>
-                    <TableHead>Status</TableHead><TableHead>Pagamento</TableHead><TableHead>Valor</TableHead>
-                    <TableHead className="w-[100px]">Ações</TableHead>
+                     <TableHead>Data</TableHead><TableHead>Horário</TableHead><TableHead>Duração</TableHead>
+                     <TableHead>Paciente</TableHead><TableHead>Psicólogo</TableHead>
+                     <TableHead>Status</TableHead><TableHead>Pagamento</TableHead><TableHead>Valor</TableHead>
+                     <TableHead className="w-[100px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhuma sessão encontrada</TableCell></TableRow>
+                   <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Nenhuma sessão encontrada</TableCell></TableRow>
                   ) : filtered.map(s => (
                     <TableRow key={s.id}>
                       <TableCell>{formatDate(s.date)}</TableCell>
+                      <TableCell>{s.time || "—"}</TableCell>
+                      <TableCell>{s.duration ? `${s.duration}min` : "—"}</TableCell>
                       <TableCell className="font-medium">{getPatientName(s.patientId)}</TableCell>
                       <TableCell>{getPsyName(s.psychologistId)}</TableCell>
                       <TableCell>
@@ -467,7 +499,7 @@ export default function Sessions() {
                       </TableCell>
                       <TableCell>
                         <Badge variant={s.paymentStatus === "paid" ? "default" : s.paymentStatus === "partial" ? "outline" : "secondary"}
-                          className={s.paymentStatus === "paid" ? "bg-green-600 text-white" : ""}>
+                          className={s.paymentStatus === "paid" ? "bg-success text-success-foreground" : ""}>
                           {paymentLabels[s.paymentStatus]}
                         </Badge>
                       </TableCell>

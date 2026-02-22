@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
   psychologist_id UUID REFERENCES psychologists(id) ON DELETE SET NULL,
   date DATE NOT NULL,
+  time VARCHAR(10) DEFAULT '',
+  duration INT DEFAULT 50,
   status VARCHAR(20) DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'completed', 'cancelled')),
   payment_status VARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'partial')),
   expected_amount NUMERIC(10,2) DEFAULT 0,
@@ -112,6 +114,12 @@ DO $$ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sessions' AND column_name='invoice_id') THEN
     ALTER TABLE sessions ADD COLUMN invoice_id UUID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sessions' AND column_name='time') THEN
+    ALTER TABLE sessions ADD COLUMN time VARCHAR(10) DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sessions' AND column_name='duration') THEN
+    ALTER TABLE sessions ADD COLUMN duration INT DEFAULT 50;
   END IF;
 END $$;
 
