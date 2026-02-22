@@ -77,6 +77,16 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
   balance NUMERIC(12,2) DEFAULT 0,
   type VARCHAR(20) DEFAULT 'checking' CHECK (type IN ('checking', 'savings', 'credit_card'))
 );
+
+-- Ensure columns exist if tables were created before
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='role') THEN
+    ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'psychologist' CHECK (role IN ('admin', 'psychologist'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='psychologist_id') THEN
+    ALTER TABLE users ADD COLUMN psychologist_id UUID REFERENCES psychologists(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 `;
 
 async function run() {
