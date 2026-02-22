@@ -41,7 +41,6 @@ export interface RecurringPlan {
   time: string;
   amount: number;
   active: boolean;
-  weeksToGenerate?: number;
 }
 
 export interface Invoice {
@@ -53,6 +52,14 @@ export interface Invoice {
   sessionIds: string[];
   notes: string;
   createdAt: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  type: "expense" | "income" | "both";
+  isDefault: boolean;
+  userId?: string;
 }
 
 export interface PersonalExpense {
@@ -79,6 +86,7 @@ export interface User {
   name: string;
   role: "admin" | "psychologist";
   psychologistId?: string;
+  createdAt?: string;
 }
 
 export interface AuthResponse {

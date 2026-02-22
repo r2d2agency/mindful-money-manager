@@ -6,7 +6,7 @@ import {
   SidebarMenuItem, SidebarProvider, SidebarInset, SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Users, Calendar, UserCog, Wallet, Brain, LogOut, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, UserCog, Wallet, Brain, LogOut, BarChart3, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const clinicMenu = [
@@ -15,6 +15,7 @@ const clinicMenu = [
   { title: "Sessões", icon: Calendar, path: "/sessoes" },
   { title: "Relatórios", icon: BarChart3, path: "/relatorios" },
   { title: "Psicólogos", icon: UserCog, path: "/psicologos", adminOnly: true },
+  { title: "Usuários", icon: Shield, path: "/usuarios", adminOnly: true },
 ];
 
 const personalMenu = [
