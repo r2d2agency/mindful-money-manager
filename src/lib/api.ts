@@ -1,6 +1,6 @@
 import type {
   Patient, Psychologist, Session, RecurringPlan,
-  PersonalExpense, BankAccount, AuthResponse, User
+  PersonalExpense, BankAccount, AuthResponse, User, Invoice
 } from "@/types";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://blaster-psi-backend.isyhhh.easypanel.host/api";
@@ -98,6 +98,15 @@ export const createRecurringPlan = (data: Omit<RecurringPlan, "id">) =>
   request<RecurringPlan>("/recurring-plans", { method: "POST", body: JSON.stringify(data) });
 export const deleteRecurringPlan = (id: string) =>
   request<void>(`/recurring-plans/${id}`, { method: "DELETE" });
+export const generateRecurringSessions = (planId: string, weeks: number) =>
+  request<Session[]>(`/recurring-plans/${planId}/generate`, { method: "POST", body: JSON.stringify({ weeks }) });
+
+// ===== INVOICES =====
+export const fetchInvoices = () => request<Invoice[]>("/invoices");
+export const createInvoice = (data: { patientId: string; psychologistId: string; amount: number; date: string; sessionIds: string[]; notes?: string }) =>
+  request<Invoice>("/invoices", { method: "POST", body: JSON.stringify(data) });
+export const deleteInvoice = (id: string) =>
+  request<void>(`/invoices/${id}`, { method: "DELETE" });
 
 // ===== PERSONAL EXPENSES =====
 export const fetchPersonalExpenses = () => request<PersonalExpense[]>("/personal-expenses");

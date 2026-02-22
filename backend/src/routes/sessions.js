@@ -13,7 +13,8 @@ router.get("/", async (req, res) => {
     res.json(result.rows.map(r => ({
       id: r.id, patientId: r.patient_id, psychologistId: r.psychologist_id, date: r.date,
       status: r.status, paymentStatus: r.payment_status, expectedAmount: parseFloat(r.expected_amount),
-      paidAmount: parseFloat(r.paid_amount), isRecurring: r.is_recurring, notes: r.notes,
+      paidAmount: parseFloat(r.paid_amount), isRecurring: r.is_recurring,
+      recurringPlanId: r.recurring_plan_id || null, invoiceId: r.invoice_id || null, notes: r.notes,
     })));
   } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
 });
@@ -30,24 +31,26 @@ router.post("/", async (req, res) => {
     res.status(201).json({
       id: r.id, patientId: r.patient_id, psychologistId: r.psychologist_id, date: r.date,
       status: r.status, paymentStatus: r.payment_status, expectedAmount: parseFloat(r.expected_amount),
-      paidAmount: parseFloat(r.paid_amount), isRecurring: r.is_recurring, notes: r.notes,
+      paidAmount: parseFloat(r.paid_amount), isRecurring: r.is_recurring,
+      recurringPlanId: r.recurring_plan_id || null, invoiceId: r.invoice_id || null, notes: r.notes,
     });
   } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
 });
 
 router.put("/:id", async (req, res) => {
   try {
-    const { status, paymentStatus, paidAmount, notes } = req.body;
+    const { status, paymentStatus, paidAmount, notes, expectedAmount } = req.body;
     const result = await pool.query(
-      "UPDATE sessions SET status=COALESCE($1,status), payment_status=COALESCE($2,payment_status), paid_amount=COALESCE($3,paid_amount), notes=COALESCE($4,notes) WHERE id=$5 RETURNING *",
-      [status, paymentStatus, paidAmount, notes, req.params.id]
+      "UPDATE sessions SET status=COALESCE($1,status), payment_status=COALESCE($2,payment_status), paid_amount=COALESCE($3,paid_amount), notes=COALESCE($4,notes), expected_amount=COALESCE($5,expected_amount) WHERE id=$6 RETURNING *",
+      [status, paymentStatus, paidAmount, notes, expectedAmount, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: "Não encontrado" });
     const r = result.rows[0];
     res.json({
       id: r.id, patientId: r.patient_id, psychologistId: r.psychologist_id, date: r.date,
       status: r.status, paymentStatus: r.payment_status, expectedAmount: parseFloat(r.expected_amount),
-      paidAmount: parseFloat(r.paid_amount), isRecurring: r.is_recurring, notes: r.notes,
+      paidAmount: parseFloat(r.paid_amount), isRecurring: r.is_recurring,
+      recurringPlanId: r.recurring_plan_id || null, invoiceId: r.invoice_id || null, notes: r.notes,
     });
   } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
 });

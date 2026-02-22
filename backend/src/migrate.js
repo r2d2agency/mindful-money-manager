@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   expected_amount NUMERIC(10,2) DEFAULT 0,
   paid_amount NUMERIC(10,2) DEFAULT 0,
   is_recurring BOOLEAN DEFAULT false,
+  recurring_plan_id UUID,
+  invoice_id UUID,
   notes TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -55,6 +57,17 @@ CREATE TABLE IF NOT EXISTS recurring_plans (
   time VARCHAR(10) NOT NULL,
   amount NUMERIC(10,2) DEFAULT 0,
   active BOOLEAN DEFAULT true
+);
+
+CREATE TABLE IF NOT EXISTS invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
+  psychologist_id UUID REFERENCES psychologists(id) ON DELETE SET NULL,
+  amount NUMERIC(10,2) NOT NULL,
+  date DATE NOT NULL,
+  session_ids JSONB DEFAULT '[]',
+  notes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS personal_expenses (
@@ -85,6 +98,12 @@ DO $$ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='psychologist_id') THEN
     ALTER TABLE users ADD COLUMN psychologist_id UUID REFERENCES psychologists(id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sessions' AND column_name='recurring_plan_id') THEN
+    ALTER TABLE sessions ADD COLUMN recurring_plan_id UUID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sessions' AND column_name='invoice_id') THEN
+    ALTER TABLE sessions ADD COLUMN invoice_id UUID;
   END IF;
 END $$;
 `;

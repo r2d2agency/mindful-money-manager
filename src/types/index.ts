@@ -28,6 +28,8 @@ export interface Session {
   expectedAmount: number;
   paidAmount: number;
   isRecurring: boolean;
+  recurringPlanId?: string;
+  invoiceId?: string;
   notes: string;
 }
 
@@ -39,6 +41,18 @@ export interface RecurringPlan {
   time: string;
   amount: number;
   active: boolean;
+  weeksToGenerate?: number;
+}
+
+export interface Invoice {
+  id: string;
+  patientId: string;
+  psychologistId: string;
+  amount: number;
+  date: string;
+  sessionIds: string[];
+  notes: string;
+  createdAt: string;
 }
 
 export interface PersonalExpense {
