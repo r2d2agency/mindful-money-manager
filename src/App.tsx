@@ -2,16 +2,32 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import Patients from "@/pages/Patients";
 import Sessions from "@/pages/Sessions";
 import Psychologists from "@/pages/Psychologists";
 import PersonalFinances from "@/pages/PersonalFinances";
+import Login from "@/pages/Login";
 import NotFound from "./pages/NotFound";
+import { ReactNode } from "react";
 
 const queryClient = new QueryClient();
+
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { isLoggedIn } = useAuth();
+  if (!isLoggedIn) return <Navigate to="/login" replace />;
+  return <AppLayout>{children}</AppLayout>;
+}
+
+function AdminRoute({ children }: { children: ReactNode }) {
+  const { isLoggedIn, isAdmin } = useAuth();
+  if (!isLoggedIn) return <Navigate to="/login" replace />;
+  if (!isAdmin) return <Navigate to="/" replace />;
+  return <AppLayout>{children}</AppLayout>;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -19,14 +35,17 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<AppLayout><Dashboard /></AppLayout>} />
-          <Route path="/pacientes" element={<AppLayout><Patients /></AppLayout>} />
-          <Route path="/sessoes" element={<AppLayout><Sessions /></AppLayout>} />
-          <Route path="/psicologos" element={<AppLayout><Psychologists /></AppLayout>} />
-          <Route path="/financas" element={<AppLayout><PersonalFinances /></AppLayout>} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/pacientes" element={<ProtectedRoute><Patients /></ProtectedRoute>} />
+            <Route path="/sessoes" element={<ProtectedRoute><Sessions /></ProtectedRoute>} />
+            <Route path="/psicologos" element={<AdminRoute><Psychologists /></AdminRoute>} />
+            <Route path="/financas" element={<ProtectedRoute><PersonalFinances /></ProtectedRoute>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

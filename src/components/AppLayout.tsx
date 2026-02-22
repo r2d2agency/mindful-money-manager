@@ -1,33 +1,19 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
+  SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton,
+  SidebarMenuItem, SidebarProvider, SidebarInset, SidebarTrigger,
 } from "@/components/ui/sidebar";
-import {
-  LayoutDashboard,
-  Users,
-  Calendar,
-  UserCog,
-  Wallet,
-  Brain,
-} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { LayoutDashboard, Users, Calendar, UserCog, Wallet, Brain, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const clinicMenu = [
   { title: "Dashboard", icon: LayoutDashboard, path: "/" },
   { title: "Pacientes", icon: Users, path: "/pacientes" },
   { title: "Sessões", icon: Calendar, path: "/sessoes" },
-  { title: "Psicólogos", icon: UserCog, path: "/psicologos" },
+  { title: "Psicólogos", icon: UserCog, path: "/psicologos", adminOnly: true },
 ];
 
 const personalMenu = [
@@ -36,6 +22,9 @@ const personalMenu = [
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const { user, isAdmin, handleLogout } = useAuth();
+
+  const visibleClinicMenu = clinicMenu.filter(item => !item.adminOnly || isAdmin);
 
   return (
     <SidebarProvider>
@@ -47,7 +36,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             </div>
             <div>
               <h1 className="text-sm font-bold text-sidebar-foreground">PsiFinance</h1>
-              <p className="text-xs text-sidebar-foreground/60">Gestão Clínica</p>
+              <p className="text-xs text-sidebar-foreground/60">{user?.name || "Gestão Clínica"}</p>
             </div>
           </Link>
         </SidebarHeader>
@@ -56,7 +45,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <SidebarGroupLabel>Clínica</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {clinicMenu.map((item) => (
+                {visibleClinicMenu.map((item) => (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton asChild isActive={location.pathname === item.path}>
                       <Link to={item.path}>
@@ -87,6 +76,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
+        <div className="p-4 border-t">
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={handleLogout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Sair
+          </Button>
+        </div>
       </Sidebar>
       <SidebarInset>
         <header className="flex h-14 items-center gap-2 border-b px-4">
