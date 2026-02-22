@@ -121,6 +121,12 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sessions' AND column_name='duration') THEN
     ALTER TABLE sessions ADD COLUMN duration INT DEFAULT 50;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='file_data') THEN
+    ALTER TABLE invoices ADD COLUMN file_data TEXT DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='invoices' AND column_name='file_name') THEN
+    ALTER TABLE invoices ADD COLUMN file_name VARCHAR(255) DEFAULT '';
+  END IF;
 END $$;
 
 -- Insert default categories if none exist

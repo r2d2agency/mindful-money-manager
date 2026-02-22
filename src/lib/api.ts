@@ -103,7 +103,7 @@ export const generateRecurringSessions = (planId: string, weeks: number) =>
 
 // ===== INVOICES =====
 export const fetchInvoices = () => request<Invoice[]>("/invoices");
-export const createInvoice = (data: { patientId: string; psychologistId: string; amount: number; date: string; sessionIds: string[]; notes?: string }) =>
+export const createInvoice = (data: { patientId: string; psychologistId: string; amount: number; date: string; sessionIds: string[]; notes?: string; fileData?: string; fileName?: string }) =>
   request<Invoice>("/invoices", { method: "POST", body: JSON.stringify(data) });
 export const deleteInvoice = (id: string) =>
   request<void>(`/invoices/${id}`, { method: "DELETE" });

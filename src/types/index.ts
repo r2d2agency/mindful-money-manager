@@ -53,6 +53,8 @@ export interface Invoice {
   date: string;
   sessionIds: string[];
   notes: string;
+  fileData?: string;
+  fileName?: string;
   createdAt: string;
 }
 
