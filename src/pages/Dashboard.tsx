@@ -3,11 +3,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { fetchPatients, fetchPsychologists, fetchSessions } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { fetchPatients, fetchPsychologists, fetchSessions, fetchInvoices } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Users, Calendar, DollarSign, TrendingUp, Loader2, BarChart3, User, AlertTriangle, Clock } from "lucide-react";
+import { Users, Calendar as CalendarIcon, DollarSign, TrendingUp, Loader2, BarChart3, User, AlertTriangle, Clock, Download, FileText } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
-import { Patient, Psychologist, Session } from "@/types";
+import { Patient, Psychologist, Session, Invoice } from "@/types";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 const CHART_COLORS = [
   "hsl(199, 89%, 38%)",
@@ -20,23 +28,44 @@ const CHART_COLORS = [
   "hsl(210, 70%, 55%)",
 ];
 
+const statusLabels: Record<string, string> = { scheduled: "Agendada", completed: "Realizada", cancelled: "Cancelada" };
+const paymentLabels: Record<string, string> = { pending: "Pendente", paid: "Pago", partial: "Parcial" };
+
 export default function Dashboard() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [psychologists, setPsychologists] = useState<Psychologist[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterPatient, setFilterPatient] = useState("all");
 
+  // Date range
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d;
+  });
+  const [dateTo, setDateTo] = useState<Date | undefined>(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1, 0);
+    return d;
+  });
+
   useEffect(() => {
-    Promise.all([fetchPatients(), fetchPsychologists(), fetchSessions()])
-      .then(([p, psy, s]) => { setPatients(p); setPsychologists(psy); setSessions(s); })
+    Promise.all([fetchPatients(), fetchPsychologists(), fetchSessions(), fetchInvoices()])
+      .then(([p, psy, s, inv]) => { setPatients(p); setPsychologists(psy); setSessions(s); setInvoices(inv); })
       .finally(() => setLoading(false));
   }, []);
 
   const filteredSessions = useMemo(() => {
-    if (filterPatient === "all") return sessions;
-    return sessions.filter(s => s.patientId === filterPatient);
-  }, [sessions, filterPatient]);
+    return sessions.filter(s => {
+      const matchPatient = filterPatient === "all" || s.patientId === filterPatient;
+      const sessionDate = s.date;
+      const matchFrom = !dateFrom || sessionDate >= dateFrom.toISOString().split("T")[0];
+      const matchTo = !dateTo || sessionDate <= dateTo.toISOString().split("T")[0];
+      return matchPatient && matchFrom && matchTo;
+    });
+  }, [sessions, filterPatient, dateFrom, dateTo]);
 
   const totalReceived = filteredSessions.filter(s => s.paymentStatus === "paid").reduce((sum, s) => sum + s.paidAmount, 0);
   const totalPending = filteredSessions.filter(s => s.paymentStatus !== "paid" && s.status !== "cancelled").reduce((sum, s) => sum + s.expectedAmount - s.paidAmount, 0);
@@ -44,7 +73,7 @@ export default function Dashboard() {
   const scheduledSessions = filteredSessions.filter(s => s.status === "scheduled").length;
   const totalSessions = filteredSessions.filter(s => s.status !== "cancelled").length;
 
-  // Monthly projection data (6 months back, 6 months forward)
+  // Monthly projection data
   const monthlyData = useMemo(() => {
     const months: Record<string, { key: string; received: number; pending: number; projected: number }> = {};
     const now = new Date();
@@ -73,7 +102,7 @@ export default function Dashboard() {
   // Per-patient summary
   const patientSummary = useMemo(() => {
     const map: Record<string, { name: string; total: number; received: number; pending: number; sessionsCount: number }> = {};
-    sessions.filter(s => s.status !== "cancelled").forEach(s => {
+    filteredSessions.filter(s => s.status !== "cancelled").forEach(s => {
       if (!map[s.patientId]) {
         const p = patients.find(p => p.id === s.patientId);
         map[s.patientId] = { name: p?.name || "—", total: 0, received: 0, pending: 0, sessionsCount: 0 };
@@ -84,7 +113,7 @@ export default function Dashboard() {
       else map[s.patientId].pending += s.expectedAmount - s.paidAmount;
     });
     return Object.entries(map).map(([id, data]) => ({ id, ...data })).sort((a, b) => b.total - a.total);
-  }, [sessions, patients]);
+  }, [filteredSessions, patients]);
 
   // Revenue by psychologist
   const psychologistData = useMemo(() => {
@@ -96,7 +125,7 @@ export default function Dashboard() {
     }).filter(d => d.total > 0);
   }, [filteredSessions, psychologists]);
 
-  // Monthly line chart for cumulative projection
+  // Cumulative
   const cumulativeData = useMemo(() => {
     let cumReceived = 0;
     let cumTotal = 0;
@@ -109,25 +138,58 @@ export default function Dashboard() {
 
   const selectedPatientName = filterPatient === "all" ? null : patients.find(p => p.id === filterPatient)?.name;
 
-  // Alerts: overdue sessions (past date, not paid, not cancelled)
+  // Alerts: overdue sessions
   const overdueAlerts = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];
-    return filteredSessions
-      .filter(s => s.date < today && s.paymentStatus !== "paid" && s.status !== "cancelled")
+    return sessions
+      .filter(s => {
+        const matchPatient = filterPatient === "all" || s.patientId === filterPatient;
+        return matchPatient && s.date < today && s.paymentStatus !== "paid" && s.status !== "cancelled";
+      })
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 10);
-  }, [filteredSessions]);
+  }, [sessions, filterPatient]);
 
   // Upcoming sessions today/tomorrow
   const upcomingToday = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
-    return filteredSessions
-      .filter(s => (s.date === today || s.date === tomorrow) && s.status === "scheduled")
+    return sessions
+      .filter(s => {
+        const matchPatient = filterPatient === "all" || s.patientId === filterPatient;
+        return matchPatient && (s.date === today || s.date === tomorrow) && s.status === "scheduled";
+      })
       .sort((a, b) => a.date.localeCompare(b.date) || (a.time || "").localeCompare(b.time || ""));
-  }, [filteredSessions]);
+  }, [sessions, filterPatient]);
 
   const getPatientName = (id: string) => patients.find(p => p.id === id)?.name || "—";
+  const getPsyName = (id: string) => psychologists.find(p => p.id === id)?.name || "—";
+
+  // Export summary as CSV
+  function exportCSV() {
+    const patientName = selectedPatientName || "Todos";
+    const fromStr = dateFrom ? format(dateFrom, "dd/MM/yyyy") : "—";
+    const toStr = dateTo ? format(dateTo, "dd/MM/yyyy") : "—";
+    
+    let csv = `Resumo Financeiro - ${patientName}\n`;
+    csv += `Período: ${fromStr} a ${toStr}\n\n`;
+    csv += `Data,Hora,Paciente,Psicólogo,Status,Pagamento,Valor Previsto,Valor Pago,Observações\n`;
+    
+    const sorted = [...filteredSessions].filter(s => s.status !== "cancelled").sort((a, b) => a.date.localeCompare(b.date));
+    sorted.forEach(s => {
+      csv += `${formatDate(s.date)},${s.time || "—"},${getPatientName(s.patientId)},${getPsyName(s.psychologistId)},${statusLabels[s.status]},${paymentLabels[s.paymentStatus]},${s.expectedAmount.toFixed(2)},${s.paidAmount.toFixed(2)},"${s.notes || ""}"\n`;
+    });
+    
+    csv += `\nTotal Previsto,,,,,,,${(totalReceived + totalPending).toFixed(2)}\n`;
+    csv += `Total Recebido,,,,,,,${totalReceived.toFixed(2)}\n`;
+    csv += `Total Pendente,,,,,,,${totalPending.toFixed(2)}\n`;
+    
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `resumo-financeiro-${patientName.replace(/\s/g, "-")}-${fromStr.replace(/\//g, "-")}.csv`;
+    a.click();
+  }
 
   if (loading) return (
     <div className="flex h-[50vh] items-center justify-center">
@@ -137,23 +199,62 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      {/* Header with filters */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
             {selectedPatientName ? `Visão financeira — ${selectedPatientName}` : "Visão geral da clínica"}
           </p>
         </div>
-        <Select value={filterPatient} onValueChange={setFilterPatient}>
-          <SelectTrigger className="w-[240px]">
-            <User className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Todos os Pacientes" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os Pacientes</SelectItem>
-            {patients.map(p => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2 flex-wrap items-end">
+          {/* Date range */}
+          <div className="flex gap-2 items-end">
+            <div>
+              <Label className="text-xs text-muted-foreground">De</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("w-[130px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-1 h-3 w-3" />
+                    {dateFrom ? format(dateFrom, "dd/MM/yy") : "Início"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Até</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("w-[130px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-1 h-3 w-3" />
+                    {dateTo ? format(dateTo, "dd/MM/yy") : "Fim"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <Select value={filterPatient} onValueChange={setFilterPatient}>
+            <SelectTrigger className="w-[200px]">
+              <User className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Todos os Pacientes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Pacientes</SelectItem>
+              {patients.map(p => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
+            </SelectContent>
+          </Select>
+
+          <Button variant="outline" size="sm" onClick={exportCSV}>
+            <Download className="mr-1 h-4 w-4" />Exportar CSV
+          </Button>
+        </div>
       </div>
 
       {/* Alerts */}
@@ -221,7 +322,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Sessões</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalSessions}</div>
@@ -230,7 +331,7 @@ export default function Dashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pacientes Ativos</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Pacientes</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -310,6 +411,75 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {/* Session Details Table */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Sessões do Período ({filteredSessions.filter(s => s.status !== "cancelled").length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {filteredSessions.filter(s => s.status !== "cancelled").length > 0 ? (
+            <div className="max-h-[400px] overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Hora</TableHead>
+                    <TableHead>Paciente</TableHead>
+                    <TableHead>Psicólogo</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Pagamento</TableHead>
+                    <TableHead className="text-right">Previsto</TableHead>
+                    <TableHead className="text-right">Pago</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredSessions
+                    .filter(s => s.status !== "cancelled")
+                    .sort((a, b) => a.date.localeCompare(b.date) || (a.time || "").localeCompare(b.time || ""))
+                    .map(s => (
+                    <TableRow key={s.id}>
+                      <TableCell>{formatDate(s.date)}</TableCell>
+                      <TableCell>{s.time || "—"}</TableCell>
+                      <TableCell className="font-medium">{getPatientName(s.patientId)}</TableCell>
+                      <TableCell>{getPsyName(s.psychologistId)}</TableCell>
+                      <TableCell>
+                        <Badge variant={s.status === "completed" ? "default" : "secondary"} className="text-xs">
+                          {statusLabels[s.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={s.paymentStatus === "paid" ? "default" : "outline"}
+                          className={cn("text-xs", s.paymentStatus === "paid" && "bg-success text-success-foreground")}
+                        >
+                          {paymentLabels[s.paymentStatus]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(s.expectedAmount)}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {s.paidAmount > 0 ? (
+                          <span className="text-success">{formatCurrency(s.paidAmount)}</span>
+                        ) : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {/* Totals row */}
+                  <TableRow className="bg-muted/50 font-bold">
+                    <TableCell colSpan={6} className="text-right">TOTAIS</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totalReceived + totalPending)}</TableCell>
+                    <TableCell className="text-right text-success">{formatCurrency(totalReceived)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="flex h-[120px] items-center justify-center text-muted-foreground">
+              Nenhuma sessão no período selecionado
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Charts Row 2 */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -328,7 +498,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             ) : (
               <div className="flex h-[280px] items-center justify-center text-muted-foreground">
-                Adicione psicólogos e sessões para ver o gráfico
+                Sem dados no período
               </div>
             )}
           </CardContent>
@@ -369,7 +539,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="flex h-[280px] items-center justify-center text-muted-foreground">
-                Adicione sessões para ver o resumo
+                Sem dados no período
               </div>
             )}
           </CardContent>
