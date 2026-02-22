@@ -8,6 +8,8 @@ const sessionsRoutes = require("./routes/sessions");
 const personalExpensesRoutes = require("./routes/personalExpenses");
 const bankAccountsRoutes = require("./routes/bankAccounts");
 const usersRoutes = require("./routes/users");
+const recurringPlansRoutes = require("./routes/recurringPlans");
+const invoicesRoutes = require("./routes/invoices");
 const { authenticate } = require("./middleware/auth");
 
 const app = express();
@@ -28,5 +30,7 @@ app.use("/api/sessions", authenticate, sessionsRoutes);
 app.use("/api/personal-expenses", authenticate, personalExpensesRoutes);
 app.use("/api/bank-accounts", authenticate, bankAccountsRoutes);
 app.use("/api/users", authenticate, usersRoutes);
+app.use("/api/recurring-plans", authenticate, recurringPlansRoutes);
+app.use("/api/invoices", authenticate, invoicesRoutes);
 
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
