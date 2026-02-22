@@ -14,7 +14,8 @@ router.get("/", async (req, res) => {
     res.json(result.rows.map(r => ({
       id: r.id, patientId: r.patient_id, psychologistId: r.psychologist_id,
       amount: parseFloat(r.amount), date: r.date, sessionIds: r.session_ids || [],
-      notes: r.notes || "", createdAt: r.created_at,
+      notes: r.notes || "", fileData: r.file_data || "", fileName: r.file_name || "",
+      createdAt: r.created_at,
     })));
   } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
 });
@@ -22,12 +23,12 @@ router.get("/", async (req, res) => {
 // Create invoice
 router.post("/", async (req, res) => {
   try {
-    const { patientId, psychologistId, amount, date, sessionIds, notes } = req.body;
+    const { patientId, psychologistId, amount, date, sessionIds, notes, fileData, fileName } = req.body;
     const psyId = req.user.role === "psychologist" ? req.user.psychologistId : psychologistId;
 
     const result = await pool.query(
-      "INSERT INTO invoices (patient_id, psychologist_id, amount, date, session_ids, notes) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
-      [patientId, psyId, amount, date, JSON.stringify(sessionIds || []), notes || ""]
+      "INSERT INTO invoices (patient_id, psychologist_id, amount, date, session_ids, notes, file_data, file_name) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",
+      [patientId, psyId, amount, date, JSON.stringify(sessionIds || []), notes || "", fileData || "", fileName || ""]
     );
 
     // Mark linked sessions as paid
@@ -44,7 +45,8 @@ router.post("/", async (req, res) => {
     res.status(201).json({
       id: r.id, patientId: r.patient_id, psychologistId: r.psychologist_id,
       amount: parseFloat(r.amount), date: r.date, sessionIds: r.session_ids || [],
-      notes: r.notes || "", createdAt: r.created_at,
+      notes: r.notes || "", fileData: r.file_data || "", fileName: r.file_name || "",
+      createdAt: r.created_at,
     });
   } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
 });

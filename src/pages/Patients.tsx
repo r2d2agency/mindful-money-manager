@@ -15,7 +15,7 @@ import {
   fetchPsychologists, fetchSessions, fetchInvoices
 } from "@/lib/api";
 import { formatDate, formatCurrency } from "@/lib/format";
-import { Plus, Pencil, Trash2, Search, Loader2, Eye, FileText, Calendar, DollarSign } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Loader2, Eye, FileText, Calendar, DollarSign, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Patient, Psychologist, Session, Invoice } from "@/types";
 
@@ -299,6 +299,19 @@ export default function Patients() {
                           </div>
                           {inv.notes && (
                             <p className="text-xs text-muted-foreground italic border-t pt-1 mt-1">{inv.notes}</p>
+                          )}
+                          {inv.fileData && (
+                            <button
+                              className="text-xs text-primary flex items-center gap-1 mt-1"
+                              onClick={() => {
+                                const a = document.createElement("a");
+                                a.href = inv.fileData!;
+                                a.download = inv.fileName || "nota";
+                                a.click();
+                              }}
+                            >
+                              <Download className="h-3 w-3" />{inv.fileName || "Baixar anexo"}
+                            </button>
                           )}
                         </div>
                       ))}

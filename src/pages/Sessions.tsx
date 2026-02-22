@@ -15,7 +15,7 @@ import {
   deleteRecurringPlan, generateRecurringSessions, fetchInvoices, createInvoice, deleteInvoice
 } from "@/lib/api";
 import { formatCurrency, formatDate, DAYS_OF_WEEK } from "@/lib/format";
-import { Plus, Trash2, CheckCircle, Search, Loader2, RefreshCw, ChevronLeft, ChevronRight, FileText, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, Trash2, CheckCircle, Search, Loader2, RefreshCw, ChevronLeft, ChevronRight, FileText, Calendar as CalendarIcon, Upload, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Session, Patient, Psychologist, RecurringPlan, Invoice } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,7 +44,7 @@ export default function Sessions() {
   const [calMonth, setCalMonth] = useState(new Date());
 
   // Invoice form
-  const [invoiceForm, setInvoiceForm] = useState({ patientId: "", amount: "", date: new Date().toISOString().split("T")[0], notes: "" });
+  const [invoiceForm, setInvoiceForm] = useState({ patientId: "", amount: "", date: new Date().toISOString().split("T")[0], notes: "", fileData: "", fileName: "" });
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
 
   const [form, setForm] = useState({ patientId: "", psychologistId: "", date: "", time: "", duration: "50", expectedAmount: "", notes: "" });
@@ -154,10 +154,12 @@ export default function Sessions() {
         date: invoiceForm.date,
         sessionIds: selectedSessionIds,
         notes: invoiceForm.notes,
+        fileData: invoiceForm.fileData,
+        fileName: invoiceForm.fileName,
       });
       await loadAll();
       setInvoiceDialogOpen(false);
-      setInvoiceForm({ patientId: "", amount: "", date: new Date().toISOString().split("T")[0], notes: "" });
+      setInvoiceForm({ patientId: "", amount: "", date: new Date().toISOString().split("T")[0], notes: "", fileData: "", fileName: "" });
       setSelectedSessionIds([]);
       toast.success("Nota emitida e sessões marcadas como pagas");
     } catch (err: any) { toast.error(err.message); }
@@ -316,6 +318,37 @@ export default function Sessions() {
                   <div><Label>Data *</Label><Input type="date" value={invoiceForm.date} onChange={e => setInvoiceForm(f => ({ ...f, date: e.target.value }))} /></div>
                 </div>
                 <div><Label>Observações</Label><Input value={invoiceForm.notes} onChange={e => setInvoiceForm(f => ({ ...f, notes: e.target.value }))} /></div>
+                <div>
+                  <Label>Anexar Arquivo (opcional)</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Button type="button" variant="outline" className="flex-1" onClick={() => {
+                      const input = document.createElement("input");
+                      input.type = "file";
+                      input.accept = "image/*,.pdf";
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (!file) return;
+                        if (file.size > 2 * 1024 * 1024) { toast.error("Arquivo deve ter no máximo 2MB"); return; }
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          setInvoiceForm(f => ({ ...f, fileData: reader.result as string, fileName: file.name }));
+                          toast.success(`Arquivo "${file.name}" anexado`);
+                        };
+                        reader.readAsDataURL(file);
+                      };
+                      input.click();
+                    }}>
+                      <Upload className="mr-2 h-4 w-4" />
+                      {invoiceForm.fileName || "Enviar Arquivo"}
+                    </Button>
+                    {invoiceForm.fileName && (
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setInvoiceForm(f => ({ ...f, fileData: "", fileName: "" }))}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Imagem ou PDF até 2MB</p>
+                </div>
                 <Button onClick={handleCreateInvoice} className="w-full" disabled={saving}>
                   {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Emitir Nota
                 </Button>
@@ -593,9 +626,9 @@ export default function Sessions() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Data</TableHead><TableHead>Paciente</TableHead>
+                     <TableHead>Data</TableHead><TableHead>Paciente</TableHead>
                       <TableHead>Psicólogo</TableHead><TableHead>Valor</TableHead>
-                      <TableHead>Sessões</TableHead><TableHead>Obs</TableHead>
+                      <TableHead>Sessões</TableHead><TableHead>Arquivo</TableHead><TableHead>Obs</TableHead>
                       <TableHead className="w-[60px]">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -607,6 +640,18 @@ export default function Sessions() {
                         <TableCell>{getPsyName(inv.psychologistId)}</TableCell>
                         <TableCell className="font-semibold">{formatCurrency(inv.amount)}</TableCell>
                         <TableCell><Badge variant="secondary">{inv.sessionIds?.length || 0} sessões</Badge></TableCell>
+                        <TableCell>
+                          {inv.fileData ? (
+                            <Button variant="ghost" size="sm" className="text-xs" onClick={() => {
+                              const a = document.createElement("a");
+                              a.href = inv.fileData!;
+                              a.download = inv.fileName || "nota";
+                              a.click();
+                            }}>
+                              <Download className="mr-1 h-3 w-3" />{inv.fileName || "Baixar"}
+                            </Button>
+                          ) : "—"}
+                        </TableCell>
                         <TableCell className="text-xs text-muted-foreground truncate max-w-[150px]">{inv.notes}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="icon" onClick={async () => {

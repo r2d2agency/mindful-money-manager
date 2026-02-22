@@ -4,8 +4,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { fetchPatients, fetchPsychologists, fetchSessions } from "@/lib/api";
-import { formatCurrency } from "@/lib/format";
-import { Users, Calendar, DollarSign, TrendingUp, Loader2, BarChart3, User } from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/format";
+import { Users, Calendar, DollarSign, TrendingUp, Loader2, BarChart3, User, AlertTriangle, Clock } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Patient, Psychologist, Session } from "@/types";
 
@@ -109,6 +109,26 @@ export default function Dashboard() {
 
   const selectedPatientName = filterPatient === "all" ? null : patients.find(p => p.id === filterPatient)?.name;
 
+  // Alerts: overdue sessions (past date, not paid, not cancelled)
+  const overdueAlerts = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return filteredSessions
+      .filter(s => s.date < today && s.paymentStatus !== "paid" && s.status !== "cancelled")
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 10);
+  }, [filteredSessions]);
+
+  // Upcoming sessions today/tomorrow
+  const upcomingToday = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+    return filteredSessions
+      .filter(s => (s.date === today || s.date === tomorrow) && s.status === "scheduled")
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.time || "").localeCompare(b.time || ""));
+  }, [filteredSessions]);
+
+  const getPatientName = (id: string) => patients.find(p => p.id === id)?.name || "—";
+
   if (loading) return (
     <div className="flex h-[50vh] items-center justify-center">
       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -135,6 +155,66 @@ export default function Dashboard() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Alerts */}
+      {(overdueAlerts.length > 0 || upcomingToday.length > 0) && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {overdueAlerts.length > 0 && (
+            <Card className="border-warning/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2 text-warning">
+                  <AlertTriangle className="h-4 w-4" />
+                  Pagamentos Vencidos ({overdueAlerts.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                  {overdueAlerts.map(s => (
+                    <div key={s.id} className="flex items-center justify-between p-2 rounded-lg bg-warning/5 border border-warning/20 text-sm">
+                      <div>
+                        <span className="font-medium">{getPatientName(s.patientId)}</span>
+                        <span className="text-muted-foreground ml-2">{formatDate(s.date)}</span>
+                      </div>
+                      <Badge variant="outline" className="text-warning border-warning">
+                        {formatCurrency(s.expectedAmount - s.paidAmount)}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {upcomingToday.length > 0 && (
+            <Card className="border-primary/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2 text-primary">
+                  <Clock className="h-4 w-4" />
+                  Sessões Hoje/Amanhã ({upcomingToday.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                  {upcomingToday.map(s => {
+                    const isToday = s.date === new Date().toISOString().split("T")[0];
+                    return (
+                      <div key={s.id} className="flex items-center justify-between p-2 rounded-lg bg-primary/5 border border-primary/20 text-sm">
+                        <div>
+                          <Badge variant={isToday ? "default" : "secondary"} className="mr-2 text-xs">
+                            {isToday ? "Hoje" : "Amanhã"}
+                          </Badge>
+                          <span className="font-medium">{getPatientName(s.patientId)}</span>
+                          {s.time && <span className="text-muted-foreground ml-2">{s.time}</span>}
+                        </div>
+                        <span className="text-muted-foreground">{formatCurrency(s.expectedAmount)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
