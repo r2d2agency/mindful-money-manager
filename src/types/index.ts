@@ -35,7 +35,7 @@ export interface RecurringPlan {
   id: string;
   patientId: string;
   psychologistId: string;
-  dayOfWeek: number; // 0-6
+  dayOfWeek: number;
   time: string;
   amount: number;
   active: boolean;
@@ -57,4 +57,17 @@ export interface BankAccount {
   name: string;
   balance: number;
   type: "checking" | "savings" | "credit_card";
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: "admin" | "psychologist";
+  psychologistId?: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
 }
