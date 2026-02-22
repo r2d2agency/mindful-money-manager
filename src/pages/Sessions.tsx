@@ -39,6 +39,7 @@ export default function Sessions() {
   const [payAmount, setPayAmount] = useState("");
   const [search, setSearch] = useState("");
   const [filterPsy, setFilterPsy] = useState("all");
+  const [filterPatient, setFilterPatient] = useState("all");
   const [saving, setSaving] = useState(false);
   const [calMonth, setCalMonth] = useState(new Date());
 
@@ -66,9 +67,10 @@ export default function Sessions() {
       const patient = patients.find(p => p.id === s.patientId);
       const matchSearch = !search || patient?.name.toLowerCase().includes(search.toLowerCase());
       const matchPsy = filterPsy === "all" || s.psychologistId === filterPsy;
-      return matchSearch && matchPsy;
+      const matchPatient = filterPatient === "all" || s.patientId === filterPatient;
+      return matchSearch && matchPsy && matchPatient;
     });
-  }, [sessions, patients, search, filterPsy]);
+  }, [sessions, patients, search, filterPsy, filterPatient]);
 
   // Calendar helpers
   const calendarDays = useMemo(() => {
@@ -389,6 +391,13 @@ export default function Sessions() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Buscar por paciente..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
         </div>
+        <Select value={filterPatient} onValueChange={setFilterPatient}>
+          <SelectTrigger className="w-[200px]"><SelectValue placeholder="Paciente" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os Pacientes</SelectItem>
+            {patients.map(p => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
+          </SelectContent>
+        </Select>
         {isAdmin && (
           <Select value={filterPsy} onValueChange={setFilterPsy}>
             <SelectTrigger className="w-[200px]"><SelectValue placeholder="Psicólogo" /></SelectTrigger>
