@@ -70,6 +70,14 @@ CREATE TABLE IF NOT EXISTS invoices (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  type VARCHAR(20) DEFAULT 'expense' CHECK (type IN ('expense', 'income', 'both')),
+  is_default BOOLEAN DEFAULT false,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS personal_expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -106,6 +114,29 @@ DO $$ BEGIN
     ALTER TABLE sessions ADD COLUMN invoice_id UUID;
   END IF;
 END $$;
+
+-- Insert default categories if none exist
+INSERT INTO categories (name, type, is_default) 
+SELECT * FROM (VALUES
+  ('Alimentação', 'expense', true),
+  ('Moradia', 'expense', true),
+  ('Transporte', 'expense', true),
+  ('Saúde', 'expense', true),
+  ('Educação', 'expense', true),
+  ('Lazer', 'expense', true),
+  ('Vestuário', 'expense', true),
+  ('Cartão de Crédito', 'expense', true),
+  ('Contas Fixas', 'expense', true),
+  ('Assinaturas', 'expense', true),
+  ('Pets', 'expense', true),
+  ('Impostos', 'expense', true),
+  ('Salário', 'income', true),
+  ('Freelance', 'income', true),
+  ('Investimentos', 'income', true),
+  ('Aluguel Recebido', 'income', true),
+  ('Outros', 'both', true)
+) AS v(name, type, is_default)
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE is_default = true LIMIT 1);
 `;
 
 async function run() {

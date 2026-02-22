@@ -1,6 +1,6 @@
 import type {
   Patient, Psychologist, Session, RecurringPlan,
-  PersonalExpense, BankAccount, AuthResponse, User, Invoice
+  PersonalExpense, BankAccount, AuthResponse, User, Invoice, Category
 } from "@/types";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://blaster-psi-backend.isyhhh.easypanel.host/api";
@@ -108,6 +108,13 @@ export const createInvoice = (data: { patientId: string; psychologistId: string;
 export const deleteInvoice = (id: string) =>
   request<void>(`/invoices/${id}`, { method: "DELETE" });
 
+// ===== CATEGORIES =====
+export const fetchCategories = () => request<Category[]>("/categories");
+export const createCategory = (data: { name: string; type: string }) =>
+  request<Category>("/categories", { method: "POST", body: JSON.stringify(data) });
+export const deleteCategory = (id: string) =>
+  request<void>(`/categories/${id}`, { method: "DELETE" });
+
 // ===== PERSONAL EXPENSES =====
 export const fetchPersonalExpenses = () => request<PersonalExpense[]>("/personal-expenses");
 export const createPersonalExpense = (data: Omit<PersonalExpense, "id">) =>
@@ -130,5 +137,9 @@ export const deleteBankAccount = (id: string) =>
 export const fetchUsers = () => request<User[]>("/users");
 export const createUser = (data: { email: string; password: string; name: string; role: "admin" | "psychologist"; psychologistId?: string }) =>
   request<User>("/users", { method: "POST", body: JSON.stringify(data) });
+export const updateUser = (id: string, data: { name?: string; email?: string; role?: string; psychologistId?: string }) =>
+  request<User>(`/users/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export const resetUserPassword = (id: string, password: string) =>
+  request<{ message: string }>(`/users/${id}/password`, { method: "PUT", body: JSON.stringify({ password }) });
 export const deleteUser = (id: string) =>
   request<void>(`/users/${id}`, { method: "DELETE" });

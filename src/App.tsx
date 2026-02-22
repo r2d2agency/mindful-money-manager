@@ -11,6 +11,7 @@ import Sessions from "@/pages/Sessions";
 import Psychologists from "@/pages/Psychologists";
 import PersonalFinances from "@/pages/PersonalFinances";
 import Reports from "@/pages/Reports";
+import UsersPage from "@/pages/Users";
 import Login from "@/pages/Login";
 import NotFound from "./pages/NotFound";
 import { ReactNode } from "react";
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/pacientes" element={<ProtectedRoute><Patients /></ProtectedRoute>} />
             <Route path="/sessoes" element={<ProtectedRoute><Sessions /></ProtectedRoute>} />
             <Route path="/psicologos" element={<AdminRoute><Psychologists /></AdminRoute>} />
+            <Route path="/usuarios" element={<AdminRoute><UsersPage /></AdminRoute>} />
             <Route path="/relatorios" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/financas" element={<ProtectedRoute><PersonalFinances /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
