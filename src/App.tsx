@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { BrandingProvider } from "@/contexts/BrandingContext";
 import AppLayout from "@/components/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import Patients from "@/pages/Patients";
@@ -12,6 +13,7 @@ import Psychologists from "@/pages/Psychologists";
 import PersonalFinances from "@/pages/PersonalFinances";
 import Reports from "@/pages/Reports";
 import UsersPage from "@/pages/Users";
+import SettingsPage from "@/pages/Settings";
 import Login from "@/pages/Login";
 import NotFound from "./pages/NotFound";
 import { ReactNode } from "react";
@@ -38,6 +40,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <BrandingProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -45,10 +48,12 @@ const App = () => (
             <Route path="/sessoes" element={<ProtectedRoute><Sessions /></ProtectedRoute>} />
             <Route path="/psicologos" element={<AdminRoute><Psychologists /></AdminRoute>} />
             <Route path="/usuarios" element={<AdminRoute><UsersPage /></AdminRoute>} />
+            <Route path="/configuracoes" element={<AdminRoute><SettingsPage /></AdminRoute>} />
             <Route path="/relatorios" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/financas" element={<ProtectedRoute><PersonalFinances /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </BrandingProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

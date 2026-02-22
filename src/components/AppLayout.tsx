@@ -6,8 +6,9 @@ import {
   SidebarMenuItem, SidebarProvider, SidebarInset, SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Users, Calendar, UserCog, Wallet, Brain, LogOut, BarChart3, Shield } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, UserCog, Wallet, Brain, LogOut, BarChart3, Shield, Settings } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBranding } from "@/contexts/BrandingContext";
 
 const clinicMenu = [
   { title: "Dashboard", icon: LayoutDashboard, path: "/" },
@@ -16,6 +17,7 @@ const clinicMenu = [
   { title: "Relatórios", icon: BarChart3, path: "/relatorios" },
   { title: "Psicólogos", icon: UserCog, path: "/psicologos", adminOnly: true },
   { title: "Usuários", icon: Shield, path: "/usuarios", adminOnly: true },
+  { title: "Configurações", icon: Settings, path: "/configuracoes", adminOnly: true },
 ];
 
 const personalMenu = [
@@ -25,6 +27,7 @@ const personalMenu = [
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { user, isAdmin, handleLogout } = useAuth();
+  const { branding } = useBranding();
 
   const visibleClinicMenu = clinicMenu.filter(item => !item.adminOnly || isAdmin);
 
@@ -33,11 +36,15 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <Sidebar>
         <SidebarHeader className="p-4">
           <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
-              <Brain className="h-5 w-5 text-sidebar-primary-foreground" />
-            </div>
+            {branding.logo_url ? (
+              <img src={branding.logo_url} alt="Logo" className="h-9 w-9 rounded-lg object-contain" />
+            ) : (
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
+                <Brain className="h-5 w-5 text-sidebar-primary-foreground" />
+              </div>
+            )}
             <div>
-              <h1 className="text-sm font-bold text-sidebar-foreground">PsiFinance</h1>
+              <h1 className="text-sm font-bold text-sidebar-foreground">{branding.app_name || "PsiFinance"}</h1>
               <p className="text-xs text-sidebar-foreground/60">{user?.name || "Gestão Clínica"}</p>
             </div>
           </Link>
