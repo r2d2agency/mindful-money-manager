@@ -23,6 +23,8 @@ export interface Session {
   patientId: string;
   psychologistId: string;
   date: string;
+  time: string;
+  duration: number;
   status: "scheduled" | "completed" | "cancelled";
   paymentStatus: "pending" | "paid" | "partial";
   expectedAmount: number;

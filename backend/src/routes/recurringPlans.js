@@ -18,20 +18,29 @@ router.get("/", async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
 });
 
-// Create recurring plan
+// Create recurring plan (supports multiple days via schedules array)
 router.post("/", async (req, res) => {
   try {
-    const { patientId, psychologistId, dayOfWeek, time, amount } = req.body;
+    const { patientId, psychologistId, schedules, amount } = req.body;
+    // schedules = [{ dayOfWeek: 1, time: "09:00" }, { dayOfWeek: 3, time: "14:00" }]
+    // Also support legacy single-day format
     const psyId = req.user.role === "psychologist" ? req.user.psychologistId : psychologistId;
-    const result = await pool.query(
-      "INSERT INTO recurring_plans (patient_id, psychologist_id, day_of_week, time, amount) VALUES ($1,$2,$3,$4,$5) RETURNING *",
-      [patientId, psyId, dayOfWeek, time, amount || 0]
-    );
-    const r = result.rows[0];
-    res.status(201).json({
-      id: r.id, patientId: r.patient_id, psychologistId: r.psychologist_id,
-      dayOfWeek: r.day_of_week, time: r.time, amount: parseFloat(r.amount), active: r.active,
-    });
+    const daySchedules = schedules || [{ dayOfWeek: req.body.dayOfWeek, time: req.body.time }];
+    
+    const plans = [];
+    for (const sched of daySchedules) {
+      const result = await pool.query(
+        "INSERT INTO recurring_plans (patient_id, psychologist_id, day_of_week, time, amount) VALUES ($1,$2,$3,$4,$5) RETURNING *",
+        [patientId, psyId, sched.dayOfWeek, sched.time || "09:00", amount || 0]
+      );
+      const r = result.rows[0];
+      plans.push({
+        id: r.id, patientId: r.patient_id, psychologistId: r.psychologist_id,
+        dayOfWeek: r.day_of_week, time: r.time, amount: parseFloat(r.amount), active: r.active,
+      });
+    }
+    // Return array if multiple, single object if one (backward compat)
+    res.status(201).json(plans.length === 1 ? plans[0] : plans);
   } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
 });
 
@@ -66,8 +75,8 @@ router.post("/:id/generate", async (req, res) => {
 
       if (existing.rows.length === 0) {
         const result = await pool.query(
-          "INSERT INTO sessions (patient_id, psychologist_id, date, status, payment_status, expected_amount, paid_amount, is_recurring, recurring_plan_id, notes) VALUES ($1,$2,$3,'scheduled','pending',$4,0,true,$5,'') RETURNING *",
-          [plan.patient_id, plan.psychologist_id, dateStr, plan.amount, plan.id]
+          "INSERT INTO sessions (patient_id, psychologist_id, date, time, duration, status, payment_status, expected_amount, paid_amount, is_recurring, recurring_plan_id, notes) VALUES ($1,$2,$3,$4,50,'scheduled','pending',$5,0,true,$6,'') RETURNING *",
+          [plan.patient_id, plan.psychologist_id, dateStr, plan.time || "", plan.amount, plan.id]
         );
         const r = result.rows[0];
         sessions.push({
