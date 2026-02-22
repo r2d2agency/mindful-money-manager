@@ -137,6 +137,26 @@ SELECT * FROM (VALUES
   ('Outros', 'both', true)
 ) AS v(name, type, is_default)
 WHERE NOT EXISTS (SELECT 1 FROM categories WHERE is_default = true LIMIT 1);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  key VARCHAR(100) PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+-- Default branding
+INSERT INTO app_settings (key, value) VALUES
+  ('app_name', 'PsiFinance'),
+  ('logo_url', ''),
+  ('primary_h', '199'),
+  ('primary_s', '89'),
+  ('primary_l', '38'),
+  ('accent_h', '168'),
+  ('accent_s', '60'),
+  ('accent_l', '42'),
+  ('sidebar_h', '199'),
+  ('sidebar_s', '89'),
+  ('sidebar_l', '18')
+ON CONFLICT (key) DO NOTHING;
 `;
 
 async function run() {

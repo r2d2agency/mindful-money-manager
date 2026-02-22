@@ -112,6 +112,11 @@ export const deleteInvoice = (id: string) =>
 export const fetchCategories = () => request<Category[]>("/categories");
 export const createCategory = (data: { name: string; type: string }) =>
   request<Category>("/categories", { method: "POST", body: JSON.stringify(data) });
+
+// ===== SETTINGS (branding) =====
+export const fetchSettings = () => request<Record<string, string>>("/settings");
+export const updateSettings = (data: Record<string, string>) =>
+  request<Record<string, string>>("/settings", { method: "PUT", body: JSON.stringify(data) });
 export const deleteCategory = (id: string) =>
   request<void>(`/categories/${id}`, { method: "DELETE" });
 
