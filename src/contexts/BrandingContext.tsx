@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { fetchSettings } from "@/lib/api";
+import { isAuthenticated } from "@/lib/api";
+
+const API_URL = import.meta.env.VITE_API_URL || "https://blaster-psi-backend.isyhhh.easypanel.host/api";
 
 interface BrandingSettings {
   app_name: string;
@@ -49,8 +51,14 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   const [branding, setBranding] = useState<BrandingSettings>(defaults);
 
   async function reload() {
+    if (!isAuthenticated()) return;
     try {
-      const data = await fetchSettings();
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch(`${API_URL}/settings`, {
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      });
+      if (!res.ok) return; // silently fail, don't redirect
+      const data = await res.json();
       const merged = { ...defaults, ...data };
       setBranding(merged);
       applyBranding(merged);
