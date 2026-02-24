@@ -42,6 +42,9 @@ export default function Sessions() {
   const [filterPatient, setFilterPatient] = useState("all");
   const [saving, setSaving] = useState(false);
   const [calMonth, setCalMonth] = useState(new Date());
+  const [calView, setCalView] = useState<"month" | "week" | "day">("month");
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [dayDetailOpen, setDayDetailOpen] = useState(false);
 
   // Invoice form
   const [invoiceForm, setInvoiceForm] = useState({ patientId: "", amount: "", date: new Date().toISOString().split("T")[0], notes: "", fileData: "", fileName: "" });
@@ -88,6 +91,43 @@ export default function Sessions() {
     const dateStr = `${calMonth.getFullYear()}-${String(calMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     return filtered.filter(s => s.date?.startsWith(dateStr));
   };
+
+  const getSessionsForDate = (date: Date) => {
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    return filtered.filter(s => s.date?.startsWith(dateStr));
+  };
+
+  // Week helpers
+  const weekDays = useMemo(() => {
+    const ref = selectedDay || calMonth;
+    const dayOfWeek = ref.getDay();
+    const start = new Date(ref);
+    start.setDate(start.getDate() - dayOfWeek);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      return d;
+    });
+  }, [calMonth, selectedDay]);
+
+  // Hours for day/week view
+  const hours = Array.from({ length: 14 }, (_, i) => i + 7); // 7:00 to 20:00
+
+  function openDayDetail(day: number) {
+    const date = new Date(calMonth.getFullYear(), calMonth.getMonth(), day);
+    setSelectedDay(date);
+    setDayDetailOpen(true);
+  }
+
+  function openDayDetailDate(date: Date) {
+    setSelectedDay(date);
+    setDayDetailOpen(true);
+  }
+
+  const selectedDaySessions = useMemo(() => {
+    if (!selectedDay) return [];
+    return getSessionsForDate(selectedDay).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  }, [selectedDay, filtered]);
 
   async function handleSave() {
     if (!form.patientId || !form.date || !form.expectedAmount) { toast.error("Preencha os campos obrigatórios"); return; }
@@ -454,54 +494,224 @@ export default function Sessions() {
         <TabsContent value="calendar">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <Button variant="ghost" size="icon" onClick={() => setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1))}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <CardTitle className="text-base capitalize">
-                {calMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
-              </CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1))}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" onClick={() => {
+                  if (calView === "month") setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1));
+                  else if (calView === "week") {
+                    const d = new Date(selectedDay || calMonth);
+                    d.setDate(d.getDate() - 7);
+                    setSelectedDay(d); setCalMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+                  } else {
+                    const d = new Date(selectedDay || calMonth);
+                    d.setDate(d.getDate() - 1);
+                    setSelectedDay(d); setCalMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+                  }
+                }}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <CardTitle className="text-base capitalize">
+                  {calView === "month" && calMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+                  {calView === "week" && `${weekDays[0].toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} — ${weekDays[6].toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}`}
+                  {calView === "day" && (selectedDay || calMonth).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+                </CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => {
+                  if (calView === "month") setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1));
+                  else if (calView === "week") {
+                    const d = new Date(selectedDay || calMonth);
+                    d.setDate(d.getDate() + 7);
+                    setSelectedDay(d); setCalMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+                  } else {
+                    const d = new Date(selectedDay || calMonth);
+                    d.setDate(d.getDate() + 1);
+                    setSelectedDay(d); setCalMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+                  }
+                }}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" onClick={() => { setCalMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1)); setSelectedDay(new Date()); }} className="text-xs mr-2">Hoje</Button>
+                <Button variant={calView === "month" ? "default" : "outline"} size="sm" onClick={() => setCalView("month")} className="text-xs">Mês</Button>
+                <Button variant={calView === "week" ? "default" : "outline"} size="sm" onClick={() => { setCalView("week"); if (!selectedDay) setSelectedDay(new Date()); }} className="text-xs">Semana</Button>
+                <Button variant={calView === "day" ? "default" : "outline"} size="sm" onClick={() => { setCalView("day"); if (!selectedDay) setSelectedDay(new Date()); }} className="text-xs">Dia</Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
-                {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(d => (
-                  <div key={d} className="bg-muted p-2 text-center text-xs font-medium text-muted-foreground">{d}</div>
-                ))}
-                {calendarDays.map((day, i) => {
-                  const daySessions = day ? getSessionsForDay(day) : [];
-                  const isToday = day && new Date().getDate() === day && new Date().getMonth() === calMonth.getMonth() && new Date().getFullYear() === calMonth.getFullYear();
-                  return (
-                    <div key={i} className={`bg-background min-h-[80px] p-1 ${!day ? "bg-muted/50" : ""} ${isToday ? "ring-2 ring-primary ring-inset" : ""}`}>
-                      {day && (
-                        <>
-                          <span className={`text-xs font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{day}</span>
-                          <div className="space-y-0.5 mt-0.5">
-                            {daySessions.slice(0, 3).map(s => (
-                              <div key={s.id}
-                                className={`text-[10px] truncate px-1 rounded cursor-pointer ${
-                                  s.paymentStatus === "paid" ? "bg-success/20 text-success" :
-                                  s.status === "cancelled" ? "bg-destructive/20 text-destructive" :
-                                  "bg-primary/15 text-primary"
-                                }`}
-                                onClick={() => s.paymentStatus !== "paid" && openPayDialog(s)}
-                                title={`${getPatientName(s.patientId)} - ${s.time || ""} ${s.duration ? s.duration + "min" : ""} - ${formatCurrency(s.expectedAmount)}`}
-                              >
-                                {s.time ? <span className="font-semibold">{s.time}</span> : null}
-                                {s.time ? " " : ""}{getPatientName(s.patientId)}
+              {/* MONTH VIEW */}
+              {calView === "month" && (
+                <>
+                  <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
+                    {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(d => (
+                      <div key={d} className="bg-muted p-2 text-center text-xs font-medium text-muted-foreground">{d}</div>
+                    ))}
+                    {calendarDays.map((day, i) => {
+                      const daySessions = day ? getSessionsForDay(day) : [];
+                      const isToday = day && new Date().getDate() === day && new Date().getMonth() === calMonth.getMonth() && new Date().getFullYear() === calMonth.getFullYear();
+                      return (
+                        <div key={i}
+                          className={`bg-background min-h-[80px] p-1 cursor-pointer hover:bg-accent/30 transition-colors ${!day ? "bg-muted/50 cursor-default" : ""} ${isToday ? "ring-2 ring-primary ring-inset" : ""}`}
+                          onClick={() => day && openDayDetail(day)}
+                        >
+                          {day && (
+                            <>
+                              <span className={`text-xs font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{day}</span>
+                              <div className="space-y-0.5 mt-0.5">
+                                {daySessions.slice(0, 3).map(s => (
+                                  <div key={s.id}
+                                    className={`text-[10px] truncate px-1 rounded ${
+                                      s.paymentStatus === "paid" ? "bg-success/20 text-success" :
+                                      s.status === "cancelled" ? "bg-destructive/20 text-destructive" :
+                                      "bg-primary/15 text-primary"
+                                    }`}
+                                    title={`${getPatientName(s.patientId)} - ${s.time || ""} - ${formatCurrency(s.expectedAmount)}`}
+                                  >
+                                    {s.time ? <span className="font-semibold">{s.time}</span> : null}
+                                    {s.time ? " " : ""}{getPatientName(s.patientId)}
+                                  </div>
+                                ))}
+                                {daySessions.length > 3 && (
+                                  <span className="text-[10px] text-muted-foreground">+{daySessions.length - 3}</span>
+                                )}
                               </div>
-                            ))}
-                            {daySessions.length > 3 && (
-                              <span className="text-[10px] text-muted-foreground">+{daySessions.length - 3}</span>
-                            )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* WEEK VIEW */}
+              {calView === "week" && (
+                <div className="overflow-x-auto">
+                  <div className="grid grid-cols-8 gap-px bg-border rounded-lg overflow-hidden min-w-[700px]">
+                    <div className="bg-muted p-2 text-center text-xs font-medium text-muted-foreground">Hora</div>
+                    {weekDays.map(d => {
+                      const isToday = d.toDateString() === new Date().toDateString();
+                      return (
+                        <div key={d.toISOString()} className={`bg-muted p-2 text-center text-xs font-medium cursor-pointer hover:bg-accent/50 ${isToday ? "text-primary font-bold" : "text-muted-foreground"}`}
+                          onClick={() => { setSelectedDay(d); setCalView("day"); }}
+                        >
+                          {d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}<br />
+                          <span className={`text-sm ${isToday ? "bg-primary text-primary-foreground rounded-full w-6 h-6 inline-flex items-center justify-center" : ""}`}>{d.getDate()}</span>
+                        </div>
+                      );
+                    })}
+                    {hours.map(h => (
+                      <>
+                        <div key={`h-${h}`} className="bg-background p-1 text-xs text-muted-foreground text-right pr-2 border-t border-border">
+                          {String(h).padStart(2, "0")}:00
+                        </div>
+                        {weekDays.map(d => {
+                          const daySessions = getSessionsForDate(d).filter(s => {
+                            const sHour = parseInt(s.time?.split(":")[0] || "-1");
+                            return sHour === h;
+                          });
+                          return (
+                            <div key={`${d.toISOString()}-${h}`} className="bg-background min-h-[48px] p-0.5 border-t border-border cursor-pointer hover:bg-accent/20"
+                              onClick={() => openDayDetailDate(d)}
+                            >
+                              {daySessions.map(s => (
+                                <div key={s.id}
+                                  className={`text-[10px] truncate px-1 py-0.5 rounded mb-0.5 ${
+                                    s.paymentStatus === "paid" ? "bg-success/20 text-success" :
+                                    s.status === "cancelled" ? "bg-destructive/20 text-destructive" :
+                                    "bg-primary/15 text-primary"
+                                  }`}
+                                >
+                                  <span className="font-semibold">{s.time}</span> {getPatientName(s.patientId)}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* DAY VIEW */}
+              {calView === "day" && (
+                <div className="space-y-0">
+                  {hours.map(h => {
+                    const daySessions = getSessionsForDate(selectedDay || calMonth).filter(s => {
+                      const sHour = parseInt(s.time?.split(":")[0] || "-1");
+                      return sHour === h;
+                    });
+                    return (
+                      <div key={h} className="flex border-t border-border min-h-[56px]">
+                        <div className="w-16 shrink-0 p-2 text-xs text-muted-foreground text-right pr-3">
+                          {String(h).padStart(2, "0")}:00
+                        </div>
+                        <div className="flex-1 p-1 space-y-1">
+                          {daySessions.map(s => (
+                            <div key={s.id}
+                              className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
+                                s.paymentStatus === "paid" ? "bg-success/10 border border-success/30" :
+                                s.status === "cancelled" ? "bg-destructive/10 border border-destructive/30" :
+                                "bg-primary/5 border border-primary/20 hover:bg-primary/10"
+                              }`}
+                              onClick={() => s.paymentStatus !== "paid" && openPayDialog(s)}
+                            >
+                              <div>
+                                <span className="font-medium text-sm">{getPatientName(s.patientId)}</span>
+                                <span className="text-xs text-muted-foreground ml-2">{s.time} · {s.duration || 50}min</span>
+                                <span className="text-xs text-muted-foreground ml-2">{getPsyName(s.psychologistId)}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold">{formatCurrency(s.expectedAmount)}</span>
+                                <Badge variant={s.paymentStatus === "paid" ? "default" : s.paymentStatus === "partial" ? "outline" : "secondary"}
+                                  className={`text-xs ${s.paymentStatus === "paid" ? "bg-success text-success-foreground" : ""}`}>
+                                  {paymentLabels[s.paymentStatus]}
+                                </Badge>
+                                {s.paymentStatus !== "paid" && (
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openPayDialog(s); }}>
+                                    <CheckCircle className="h-4 w-4 text-success" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Sessions without time */}
+                  {(() => {
+                    const noTimeSessions = getSessionsForDate(selectedDay || calMonth).filter(s => !s.time);
+                    if (noTimeSessions.length === 0) return null;
+                    return (
+                      <div className="border-t border-border pt-2 mt-2">
+                        <p className="text-xs text-muted-foreground mb-2 px-2">Sem horário definido</p>
+                        {noTimeSessions.map(s => (
+                          <div key={s.id}
+                            className={`flex items-center justify-between p-2 rounded-lg cursor-pointer mx-1 mb-1 ${
+                              s.paymentStatus === "paid" ? "bg-success/10 border border-success/30" :
+                              "bg-primary/5 border border-primary/20 hover:bg-primary/10"
+                            }`}
+                            onClick={() => s.paymentStatus !== "paid" && openPayDialog(s)}
+                          >
+                            <div>
+                              <span className="font-medium text-sm">{getPatientName(s.patientId)}</span>
+                              <span className="text-xs text-muted-foreground ml-2">{getPsyName(s.psychologistId)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold">{formatCurrency(s.expectedAmount)}</span>
+                              <Badge variant={s.paymentStatus === "paid" ? "default" : "secondary"}
+                                className={`text-xs ${s.paymentStatus === "paid" ? "bg-success text-success-foreground" : ""}`}>
+                                {paymentLabels[s.paymentStatus]}
+                              </Badge>
+                            </div>
                           </div>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
               <div className="flex gap-4 mt-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-primary/15" /> Agendada</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-success/20" /> Paga</span>
@@ -509,6 +719,64 @@ export default function Sessions() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Day detail dialog */}
+          <Dialog open={dayDetailOpen} onOpenChange={setDayDetailOpen}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>
+                  {selectedDay?.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+                </DialogTitle>
+              </DialogHeader>
+              {selectedDaySessions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-6">Nenhuma sessão neste dia</p>
+              ) : (
+                <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                  {selectedDaySessions.map(s => (
+                    <div key={s.id} className={`p-3 rounded-lg border ${
+                      s.paymentStatus === "paid" ? "border-success/30 bg-success/5" :
+                      s.status === "cancelled" ? "border-destructive/30 bg-destructive/5" :
+                      "border-border"
+                    }`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div>
+                          <span className="font-semibold">{getPatientName(s.patientId)}</span>
+                          {s.time && <span className="text-sm text-muted-foreground ml-2">{s.time} · {s.duration || 50}min</span>}
+                        </div>
+                        <Badge variant={s.paymentStatus === "paid" ? "default" : s.paymentStatus === "partial" ? "outline" : "secondary"}
+                          className={`text-xs ${s.paymentStatus === "paid" ? "bg-success text-success-foreground" : ""}`}>
+                          {paymentLabels[s.paymentStatus]}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">{getPsyName(s.psychologistId)}</span>
+                          <span className="ml-3 font-medium">{formatCurrency(s.expectedAmount)}</span>
+                          {s.paidAmount > 0 && s.paymentStatus !== "paid" && (
+                            <span className="text-success ml-2">(pago: {formatCurrency(s.paidAmount)})</span>
+                          )}
+                        </div>
+                        {s.paymentStatus !== "paid" && s.status !== "cancelled" && (
+                          <Button size="sm" variant="outline" onClick={() => { setDayDetailOpen(false); openPayDialog(s); }}>
+                            <CheckCircle className="mr-1 h-3 w-3 text-success" />Baixar
+                          </Button>
+                        )}
+                      </div>
+                      {s.invoiceId && (
+                        <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+                          <FileText className="h-3 w-3" /> Nota vinculada
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <div className="border-t pt-2 flex justify-between text-sm font-medium">
+                    <span>Total do dia</span>
+                    <span>{formatCurrency(selectedDaySessions.filter(s => s.status !== "cancelled").reduce((sum, s) => sum + s.expectedAmount, 0))}</span>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* LIST VIEW */}
