@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PatientCombobox } from "@/components/PatientCombobox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -329,10 +330,12 @@ export default function Sessions() {
               <div className="space-y-4">
                 <div>
                   <Label>Paciente *</Label>
-                  <Select value={invoiceForm.patientId} onValueChange={v => { setInvoiceForm(f => ({ ...f, patientId: v })); setSelectedSessionIds([]); }}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>{patients.map(p => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}</SelectContent>
-                  </Select>
+                  <PatientCombobox
+                    options={patients.map(p => ({ value: p.id, label: p.name }))}
+                    value={invoiceForm.patientId}
+                    onValueChange={v => { setInvoiceForm(f => ({ ...f, patientId: v })); setSelectedSessionIds([]); }}
+                    placeholder="Selecione"
+                  />
                 </div>
                 {unpaidSessionsForPatient.length > 0 && (
                   <div>
@@ -464,13 +467,15 @@ export default function Sessions() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Buscar por paciente..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <Select value={filterPatient} onValueChange={setFilterPatient}>
-          <SelectTrigger className="w-[200px]"><SelectValue placeholder="Paciente" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os Pacientes</SelectItem>
-            {patients.map(p => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
-          </SelectContent>
-        </Select>
+        <PatientCombobox
+          options={patients.map(p => ({ value: p.id, label: p.name }))}
+          value={filterPatient}
+          onValueChange={setFilterPatient}
+          placeholder="Paciente"
+          showAll
+          allLabel="Todos os Pacientes"
+          className="w-[200px]"
+        />
         {isAdmin && (
           <Select value={filterPsy} onValueChange={setFilterPsy}>
             <SelectTrigger className="w-[200px]"><SelectValue placeholder="Psicólogo" /></SelectTrigger>

@@ -17,6 +17,7 @@ import { Patient, Psychologist, Session, Invoice } from "@/types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { PatientCombobox } from "@/components/PatientCombobox";
 import { toast } from "sonner";
 
 const CHART_COLORS = [
@@ -261,16 +262,14 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <Select value={filterPatient} onValueChange={setFilterPatient}>
-            <SelectTrigger className="w-[200px]">
-              <User className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Todos os Pacientes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Pacientes</SelectItem>
-              {patients.map(p => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
-            </SelectContent>
-          </Select>
+          <PatientCombobox
+            options={patients.map(p => ({ value: p.id, label: p.name }))}
+            value={filterPatient}
+            onValueChange={setFilterPatient}
+            showAll
+            allLabel="Todos os Pacientes"
+            className="w-[200px]"
+          />
 
           <Button variant="outline" size="sm" onClick={exportCSV}>
             <Download className="mr-1 h-4 w-4" />Exportar CSV

@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PatientCombobox } from "@/components/PatientCombobox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -140,13 +141,14 @@ export default function Reports() {
               </SelectContent>
             </Select>
           )}
-          <Select value={filterPatient} onValueChange={setFilterPatient}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Paciente" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos Pacientes</SelectItem>
-              {patients.map(p => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
-            </SelectContent>
-          </Select>
+          <PatientCombobox
+            options={patients.map(p => ({ value: p.id, label: p.name }))}
+            value={filterPatient}
+            onValueChange={setFilterPatient}
+            showAll
+            allLabel="Todos Pacientes"
+            className="w-[180px]"
+          />
         </div>
       </div>
 
