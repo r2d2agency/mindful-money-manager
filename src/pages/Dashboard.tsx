@@ -8,14 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { fetchPatients, fetchPsychologists, fetchSessions, fetchInvoices } from "@/lib/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { fetchPatients, fetchPsychologists, fetchSessions, fetchInvoices, updateSession } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Users, Calendar as CalendarIcon, DollarSign, TrendingUp, Loader2, BarChart3, User, AlertTriangle, Clock, Download, FileText } from "lucide-react";
+import { Users, Calendar as CalendarIcon, DollarSign, TrendingUp, Loader2, BarChart3, User, AlertTriangle, Clock, Download, FileText, CheckCircle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Patient, Psychologist, Session, Invoice } from "@/types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const CHART_COLORS = [
   "hsl(199, 89%, 38%)",
@@ -38,6 +40,25 @@ export default function Dashboard() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterPatient, setFilterPatient] = useState("all");
+  const [baixaSession, setBaixaSession] = useState<Session | null>(null);
+  const [baixaAmount, setBaixaAmount] = useState("");
+  const [baixaLoading, setBaixaLoading] = useState(false);
+
+  async function handleBaixa() {
+    if (!baixaSession) return;
+    setBaixaLoading(true);
+    try {
+      const amount = parseFloat(baixaAmount) || baixaSession.expectedAmount;
+      await updateSession(baixaSession.id, { paymentStatus: "paid", paidAmount: amount });
+      setSessions(prev => prev.map(s => s.id === baixaSession.id ? { ...s, paymentStatus: "paid", paidAmount: amount } : s));
+      toast.success("Pagamento registrado com sucesso!");
+      setBaixaSession(null);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao dar baixa");
+    } finally {
+      setBaixaLoading(false);
+    }
+  }
 
   // Date range
   const [dateFrom, setDateFrom] = useState<Date | undefined>(() => {
@@ -271,14 +292,21 @@ export default function Dashboard() {
               <CardContent>
                 <div className="space-y-2 max-h-[200px] overflow-y-auto">
                   {overdueAlerts.map(s => (
-                    <div key={s.id} className="flex items-center justify-between p-2 rounded-lg bg-warning/5 border border-warning/20 text-sm">
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between p-2 rounded-lg bg-warning/5 border border-warning/20 text-sm cursor-pointer hover:bg-warning/10 transition-colors"
+                      onClick={() => { setBaixaSession(s); setBaixaAmount(String(s.expectedAmount - s.paidAmount)); }}
+                    >
                       <div>
                         <span className="font-medium">{getPatientName(s.patientId)}</span>
                         <span className="text-muted-foreground ml-2">{formatDate(s.date)}</span>
                       </div>
-                      <Badge variant="outline" className="text-warning border-warning">
-                        {formatCurrency(s.expectedAmount - s.paidAmount)}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-warning border-warning">
+                          {formatCurrency(s.expectedAmount - s.paidAmount)}
+                        </Badge>
+                        <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -545,6 +573,42 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Baixa Dialog */}
+      <Dialog open={!!baixaSession} onOpenChange={(open) => !open && setBaixaSession(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Dar Baixa no Pagamento</DialogTitle>
+          </DialogHeader>
+          {baixaSession && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-muted p-3 space-y-1 text-sm">
+                <p><strong>Paciente:</strong> {getPatientName(baixaSession.patientId)}</p>
+                <p><strong>Data da sessão:</strong> {formatDate(baixaSession.date)}</p>
+                <p><strong>Valor previsto:</strong> {formatCurrency(baixaSession.expectedAmount)}</p>
+                <p><strong>Já pago:</strong> {formatCurrency(baixaSession.paidAmount)}</p>
+                <p><strong>Restante:</strong> {formatCurrency(baixaSession.expectedAmount - baixaSession.paidAmount)}</p>
+              </div>
+              <div>
+                <Label>Valor a registrar (R$)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={baixaAmount}
+                  onChange={(e) => setBaixaAmount(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBaixaSession(null)}>Cancelar</Button>
+            <Button onClick={handleBaixa} disabled={baixaLoading}>
+              {baixaLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+              Confirmar Baixa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
