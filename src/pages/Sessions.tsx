@@ -17,6 +17,11 @@ import {
 } from "@/lib/api";
 import { formatCurrency, formatDate, DAYS_OF_WEEK } from "@/lib/format";
 import { Plus, Trash2, CheckCircle, Search, Loader2, RefreshCw, ChevronLeft, ChevronRight, FileText, Calendar as CalendarIcon, Upload, Download } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Session, Patient, Psychologist, RecurringPlan, Invoice } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,6 +51,8 @@ export default function Sessions() {
   const [calView, setCalView] = useState<"month" | "week" | "day">("month");
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [dayDetailOpen, setDayDetailOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
   // Invoice form
   const [invoiceForm, setInvoiceForm] = useState({ patientId: "", amount: "", date: new Date().toISOString().split("T")[0], notes: "", fileData: "", fileName: "" });
@@ -72,9 +79,12 @@ export default function Sessions() {
       const matchSearch = !search || patient?.name.toLowerCase().includes(search.toLowerCase());
       const matchPsy = filterPsy === "all" || s.psychologistId === filterPsy;
       const matchPatient = filterPatient === "all" || s.patientId === filterPatient;
-      return matchSearch && matchPsy && matchPatient;
+      const sDate = new Date(s.date + "T00:00:00");
+      const matchFrom = !dateFrom || sDate >= dateFrom;
+      const matchTo = !dateTo || sDate <= dateTo;
+      return matchSearch && matchPsy && matchPatient && matchFrom && matchTo;
     });
-  }, [sessions, patients, search, filterPsy, filterPatient]);
+  }, [sessions, patients, search, filterPsy, filterPatient, dateFrom, dateTo]);
 
   // Calendar helpers
   const calendarDays = useMemo(() => {
@@ -462,7 +472,7 @@ export default function Sessions() {
       </Dialog>
 
       {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex gap-3 flex-wrap items-end">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Buscar por paciente..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
@@ -484,6 +494,33 @@ export default function Sessions() {
               {psychologists.map(p => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
             </SelectContent>
           </Select>
+        )}
+      </div>
+      <div className="flex gap-3 flex-wrap items-center">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Data início"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <CalendarPicker mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} />
+          </PopoverContent>
+        </Popover>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {dateTo ? format(dateTo, "dd/MM/yyyy") : "Data fim"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <CalendarPicker mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className={cn("p-3 pointer-events-auto")} />
+          </PopoverContent>
+        </Popover>
+        {(dateFrom || dateTo) && (
+          <Button variant="ghost" size="sm" onClick={() => { setDateFrom(undefined); setDateTo(undefined); }}>Limpar datas</Button>
         )}
       </div>
 
