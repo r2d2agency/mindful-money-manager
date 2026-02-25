@@ -49,10 +49,14 @@ export default function Dashboard() {
     if (!baixaSession) return;
     setBaixaLoading(true);
     try {
-      const amount = parseFloat(baixaAmount) || baixaSession.expectedAmount;
-      await updateSession(baixaSession.id, { paymentStatus: "paid", paidAmount: amount });
-      setSessions(prev => prev.map(s => s.id === baixaSession.id ? { ...s, paymentStatus: "paid", paidAmount: amount } : s));
-      toast.success("Pagamento registrado com sucesso!");
+      const amount = parseFloat(baixaAmount) || 0;
+      const newPaid = baixaSession.paidAmount + amount;
+      const isFullyPaid = newPaid >= baixaSession.expectedAmount;
+      const status = isFullyPaid ? "paid" : "partial";
+      const finalPaid = isFullyPaid ? baixaSession.expectedAmount : newPaid;
+      await updateSession(baixaSession.id, { paymentStatus: status, paidAmount: finalPaid });
+      setSessions(prev => prev.map(s => s.id === baixaSession.id ? { ...s, paymentStatus: status, paidAmount: finalPaid } : s));
+      toast.success(isFullyPaid ? "Pagamento integral registrado!" : `Baixa parcial de ${formatCurrency(amount)} registrada. Saldo restante: ${formatCurrency(baixaSession.expectedAmount - finalPaid)}`);
       setBaixaSession(null);
     } catch (err: any) {
       toast.error(err.message || "Erro ao dar baixa");
@@ -166,7 +170,7 @@ export default function Dashboard() {
     return sessions
       .filter(s => {
         const matchPatient = filterPatient === "all" || s.patientId === filterPatient;
-        return matchPatient && s.date < today && s.paymentStatus !== "paid" && s.status !== "cancelled";
+        return matchPatient && s.date < today && s.paymentStatus !== "paid" && s.status !== "cancelled" && s.paidAmount < s.expectedAmount;
       })
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 10);
@@ -299,8 +303,14 @@ export default function Dashboard() {
                       <div>
                         <span className="font-medium">{getPatientName(s.patientId)}</span>
                         <span className="text-muted-foreground ml-2">{formatDate(s.date)}</span>
+                        {s.paidAmount > 0 && (
+                          <span className="text-xs text-muted-foreground ml-1">(pago: {formatCurrency(s.paidAmount)})</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
+                        {s.paymentStatus === "partial" && (
+                          <Badge variant="secondary" className="text-xs">Parcial</Badge>
+                        )}
                         <Badge variant="outline" className="text-warning border-warning">
                           {formatCurrency(s.expectedAmount - s.paidAmount)}
                         </Badge>
