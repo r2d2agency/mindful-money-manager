@@ -9,9 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { fetchPatients, fetchPsychologists, fetchSessions, fetchInvoices, updateSession } from "@/lib/api";
+import { fetchPatients, fetchPsychologists, fetchSessions, fetchInvoices, updateSession, deleteSession } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Users, Calendar as CalendarIcon, DollarSign, TrendingUp, Loader2, BarChart3, User, AlertTriangle, Clock, Download, FileText, CheckCircle } from "lucide-react";
+import { Users, Calendar as CalendarIcon, DollarSign, TrendingUp, Loader2, BarChart3, User, AlertTriangle, Clock, Download, FileText, CheckCircle, Trash2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Patient, Psychologist, Session, Invoice } from "@/types";
 import { format } from "date-fns";
@@ -315,6 +315,22 @@ export default function Dashboard() {
                           {formatCurrency(s.expectedAmount - s.paidAmount)}
                         </Badge>
                         <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm("Tem certeza que deseja apagar esta sessão?")) {
+                              deleteSession(s.id).then(() => {
+                                setSessions(prev => prev.filter(x => x.id !== s.id));
+                                toast.success("Sessão removida");
+                              }).catch((err: any) => toast.error(err.message));
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
                       </div>
                     </div>
                   ))}
