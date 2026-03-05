@@ -90,14 +90,21 @@ router.get("/instances/:id/status", async (req, res) => {
     const wapiRes = await fetch(`${WAPI_BASE}/instance/status?instanceId=${instance_id}`, {
       headers: { "Authorization": `Bearer ${token}` },
     });
-    const data = await wapiRes.json();
 
-    const isConnected = data.connected === true;
+    let data;
+    try { data = await wapiRes.json(); } catch { data = {}; }
+
+    console.log("W-API status response:", JSON.stringify(data));
+
+    // W-API pode retornar { connected: true } ou { status: "CONNECTED" } ou { state: "open" }
+    const isConnected = data.connected === true || data.status === "CONNECTED" || data.state === "open";
+    const phone = data.connectedPhone || data.phone || data.me?.user || null;
+
     await pool.query("UPDATE whatsapp_instances SET status = $1, connected_phone = $2 WHERE id = $3",
-      [isConnected ? "connected" : "disconnected", data.connectedPhone || null, req.params.id]);
+      [isConnected ? "connected" : "disconnected", phone, req.params.id]);
 
-    res.json({ ...data, dbStatus: isConnected ? "connected" : "disconnected" });
-  } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
+    res.json({ connected: isConnected, connectedPhone: phone, raw: data, dbStatus: isConnected ? "connected" : "disconnected" });
+  } catch (err) { console.error("Status error:", err); res.status(500).json({ message: "Erro ao verificar status: " + err.message }); }
 });
 
 // ===== SEND MESSAGES =====
