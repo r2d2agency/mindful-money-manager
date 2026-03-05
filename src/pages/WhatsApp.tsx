@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,11 @@ export default function WhatsApp() {
   const [showNewInstance, setShowNewInstance] = useState(false);
   const [newName, setNewName] = useState("");
   const [globalToken, setGlobalToken] = useState("");
+  const [autoCreate, setAutoCreate] = useState(true);
+  const [rejectCalls, setRejectCalls] = useState(true);
+  const [callMessage, setCallMessage] = useState("Não estamos disponíveis no momento.");
+  const [manualInstanceId, setManualInstanceId] = useState("");
+  const [manualToken, setManualToken] = useState("");
   const [creatingInstance, setCreatingInstance] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
@@ -91,13 +97,19 @@ export default function WhatsApp() {
   }
 
   async function handleCreateInstance() {
-    if (!newName || !globalToken) return toast.error("Preencha todos os campos");
+    if (!newName) return toast.error("Preencha o nome da conexão");
+    if (autoCreate && !globalToken) return toast.error("Token global é obrigatório para criação automática");
+    if (!autoCreate && (!manualInstanceId || !manualToken)) return toast.error("Preencha Instance ID e Token");
     setCreatingInstance(true);
     try {
-      await createWhatsAppInstance({ instanceName: newName, globalToken });
+      await createWhatsAppInstance({
+        instanceName: newName, globalToken,
+        autoCreate, rejectCalls, callMessage,
+        manualInstanceId, manualToken,
+      });
       toast.success("Instância criada!");
       setShowNewInstance(false);
-      setNewName(""); setGlobalToken("");
+      setNewName(""); setGlobalToken(""); setManualInstanceId(""); setManualToken("");
       loadInstances();
     } catch (err: any) { toast.error(err.message); }
     setCreatingInstance(false);
@@ -242,13 +254,71 @@ export default function WhatsApp() {
 
           {/* New instance dialog */}
           <Dialog open={showNewInstance} onOpenChange={setShowNewInstance}>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Nova Instância WhatsApp</DialogTitle></DialogHeader>
-              <div className="space-y-4">
-                <div><Label>Nome da instância</Label><Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Minha clínica" /></div>
-                <div><Label>Token Global (Integrador W-API)</Label><Input value={globalToken} onChange={e => setGlobalToken(e.target.value)} placeholder="Seu token de integrador" type="password" /></div>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Nova Conexão WhatsApp</DialogTitle>
+                <p className="text-sm text-muted-foreground">Escolha o provedor e configure sua conexão.</p>
+              </DialogHeader>
+              <div className="space-y-5">
+                <div>
+                  <Label>Provedor</Label>
+                  <div className="mt-1 flex items-center gap-2 border rounded-md p-3 bg-muted/30">
+                    <span className="text-lg">📡</span>
+                    <span className="font-medium">W-API</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">W-API: Cria instância automaticamente ou use dados manuais</p>
+                </div>
+
+                <div>
+                  <Label>Nome da Conexão</Label>
+                  <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ex: WhatsApp Principal" className="mt-1" />
+                </div>
+
+                <div className="border rounded-md p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">Criar instância automaticamente</p>
+                      <p className="text-xs text-muted-foreground">Usa o token de integrador configurado em Admin {'>'} Integrações</p>
+                    </div>
+                    <Switch checked={autoCreate} onCheckedChange={setAutoCreate} />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">Rejeitar chamadas</p>
+                      <p className="text-xs text-muted-foreground">Rejeitar chamadas recebidas automaticamente</p>
+                    </div>
+                    <Switch checked={rejectCalls} onCheckedChange={setRejectCalls} />
+                  </div>
+                </div>
+
+                {rejectCalls && (
+                  <div>
+                    <Label>Mensagem de rejeição</Label>
+                    <Textarea value={callMessage} onChange={e => setCallMessage(e.target.value)} placeholder="Não estamos disponíveis no momento." rows={2} className="mt-1" />
+                  </div>
+                )}
+
+                {autoCreate ? (
+                  <div>
+                    <Label>Token Global (Integrador W-API)</Label>
+                    <Input value={globalToken} onChange={e => setGlobalToken(e.target.value)} placeholder="Seu token de integrador" type="password" className="mt-1" />
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <Label>Instance ID</Label>
+                      <Input value={manualInstanceId} onChange={e => setManualInstanceId(e.target.value)} placeholder="ID da instância existente" className="mt-1" />
+                    </div>
+                    <div>
+                      <Label>Token da Instância</Label>
+                      <Input value={manualToken} onChange={e => setManualToken(e.target.value)} placeholder="Token da instância" type="password" className="mt-1" />
+                    </div>
+                  </>
+                )}
               </div>
-              <DialogFooter>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setShowNewInstance(false)}>Cancelar</Button>
                 <Button onClick={handleCreateInstance} disabled={creatingInstance}>
                   {creatingInstance ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />} Criar
                 </Button>
