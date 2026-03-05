@@ -119,8 +119,13 @@ export default function WhatsApp() {
     setQrLoading(true); setQrInstanceId(id); setQrCode(null);
     try {
       const data = await getWhatsAppQRCode(id);
-      if (data.qrcode) setQrCode(data.qrcode);
-      else toast.error("QR code não disponível. Verifique se a instância já está conectada.");
+      const qr = data.qrcode || data.base64;
+      if (qr) {
+        // Handle both raw base64 and data URI formats
+        setQrCode(qr.startsWith("data:") ? qr : `data:image/png;base64,${qr}`);
+      } else {
+        toast.error("QR code não disponível. Verifique se a instância já está conectada.");
+      }
     } catch (err: any) { toast.error(err.message); }
     setQrLoading(false);
   }
@@ -240,7 +245,7 @@ export default function WhatsApp() {
               <DialogHeader><DialogTitle>QR Code WhatsApp</DialogTitle></DialogHeader>
               <div className="flex justify-center py-4">
                 {qrLoading ? <Loader2 className="h-12 w-12 animate-spin" /> :
-                 qrCode ? <img src={`data:image/png;base64,${qrCode}`} alt="QR Code" className="max-w-[280px]" /> :
+                 qrCode ? <img src={qrCode} alt="QR Code" className="max-w-[280px]" /> :
                  <p>QR code não disponível</p>}
               </div>
               <p className="text-xs text-muted-foreground text-center">Escaneie com o WhatsApp no celular. O código expira em 20s.</p>
