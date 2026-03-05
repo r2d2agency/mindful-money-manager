@@ -246,7 +246,7 @@ export default function Reports() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-medium text-muted-foreground">Sessões</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent><div className="text-xl font-bold">{completedSessions}/{totalSessions}</div></CardContent>
         </Card>
