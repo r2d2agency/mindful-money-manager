@@ -44,6 +44,8 @@ export default function Patients() {
   const [billingConfig, setBillingConfig] = useState<any>(null);
   const [billingActive, setBillingActive] = useState(false);
   const [billingDay, setBillingDay] = useState(5);
+  const [billingTime, setBillingTime] = useState("09:00");
+  const [billingInterval, setBillingInterval] = useState(5);
   const [billingTemplateId, setBillingTemplateId] = useState("");
   const [billingInstanceId, setBillingInstanceId] = useState("");
   const [waTemplates, setWaTemplates] = useState<any[]>([]);
@@ -131,11 +133,15 @@ export default function Patients() {
       if (config) {
         setBillingActive(config.active);
         setBillingDay(config.billing_day);
+        setBillingTime(config.billing_time || "09:00");
+        setBillingInterval(config.interval_minutes || 5);
         setBillingTemplateId(config.template_id || "");
         setBillingInstanceId(config.instance_id || "");
       } else {
         setBillingActive(false);
         setBillingDay(5);
+        setBillingTime("09:00");
+        setBillingInterval(5);
         setBillingTemplateId("");
         setBillingInstanceId("");
       }
@@ -152,8 +158,8 @@ export default function Patients() {
         toast.success("Cobrança automática desativada");
       } else if (billingActive) {
         if (!billingTemplateId || !billingInstanceId) { toast.error("Selecione template e instância"); setSavingBilling(false); return; }
-        await updateBillingConfig(selectedPatient.id, { active: true, billingDay: billingDay, templateId: billingTemplateId, instanceId: billingInstanceId });
-        toast.success("Cobrança automática configurada!");
+        await updateBillingConfig(selectedPatient.id, { active: true, billingDay, billingTime, intervalMinutes: billingInterval, templateId: billingTemplateId, instanceId: billingInstanceId });
+        toast.success("Cobrança automática configurada! Agendamentos gerados automaticamente.");
       }
     } catch (err: any) { toast.error(err.message); }
     setSavingBilling(false);
@@ -427,6 +433,16 @@ export default function Patients() {
                       <div>
                         <Label>Dia do mês para cobrança</Label>
                         <Input type="number" min={1} max={31} value={billingDay} onChange={e => setBillingDay(parseInt(e.target.value) || 5)} />
+                      </div>
+                      <div>
+                        <Label>Horário de envio</Label>
+                        <Input type="time" value={billingTime} onChange={e => setBillingTime(e.target.value)} />
+                        <p className="text-xs text-muted-foreground mt-1">Horário que a mensagem será enviada</p>
+                      </div>
+                      <div>
+                        <Label>Intervalo entre mensagens (minutos)</Label>
+                        <Input type="number" min={1} max={120} value={billingInterval} onChange={e => setBillingInterval(parseInt(e.target.value) || 5)} />
+                        <p className="text-xs text-muted-foreground mt-1">Intervalo entre cobranças do mesmo dia para não enviar tudo de uma vez</p>
                       </div>
                       <div>
                         <Label>Template de mensagem</Label>

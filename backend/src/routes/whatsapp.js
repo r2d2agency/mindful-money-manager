@@ -369,22 +369,56 @@ router.get("/billing-config/:patientId", async (req, res) => {
 
 router.put("/billing-config/:patientId", async (req, res) => {
   try {
-    const { active, billingDay, templateId, instanceId } = req.body;
+    const { active, billingDay, billingTime, intervalMinutes, templateId, instanceId } = req.body;
     const result = await pool.query(
-      `INSERT INTO patient_billing_config (patient_id, active, billing_day, template_id, instance_id)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (patient_id) DO UPDATE SET active=$2, billing_day=$3, template_id=$4, instance_id=$5, updated_at=NOW()
+      `INSERT INTO patient_billing_config (patient_id, active, billing_day, billing_time, interval_minutes, template_id, instance_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (patient_id) DO UPDATE SET active=$2, billing_day=$3, billing_time=$4, interval_minutes=$5, template_id=$6, instance_id=$7, updated_at=NOW()
        RETURNING *`,
-      [req.params.patientId, active, billingDay, templateId || null, instanceId || null]
+      [req.params.patientId, active, billingDay, billingTime || '09:00', intervalMinutes || 5, templateId || null, instanceId || null]
     );
-    res.json(result.rows[0]);
+
+    const config = result.rows[0];
+
+    // Auto-generate scheduled billings when activated
+    if (active && templateId && instanceId) {
+      for (let m = 0; m < 3; m++) {
+        const date = new Date();
+        date.setMonth(date.getMonth() + m);
+        const day = Math.min(billingDay, new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate());
+        date.setDate(day);
+        const dateStr = date.toISOString().split("T")[0];
+
+        if (new Date(dateStr) < new Date(new Date().toISOString().split("T")[0])) continue;
+
+        const exists = await pool.query(
+          "SELECT 1 FROM scheduled_billings WHERE patient_id=$1 AND scheduled_date=$2 AND status != 'cancelled'",
+          [req.params.patientId, dateStr]
+        );
+        if (exists.rows.length) continue;
+
+        await pool.query(
+          `INSERT INTO scheduled_billings (patient_id, config_id, template_id, instance_id, scheduled_date, scheduled_time) VALUES ($1,$2,$3,$4,$5,$6)`,
+          [req.params.patientId, config.id, templateId, instanceId, dateStr, billingTime || '09:00']
+        );
+      }
+    }
+
+    // If deactivated, cancel future pending billings
+    if (!active) {
+      await pool.query(
+        "UPDATE scheduled_billings SET status='cancelled' WHERE patient_id = $1 AND status='pending' AND scheduled_date > CURRENT_DATE",
+        [req.params.patientId]
+      );
+    }
+
+    res.json(config);
   } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
 });
 
 router.delete("/billing-config/:patientId", async (req, res) => {
   try {
     await pool.query("DELETE FROM patient_billing_config WHERE patient_id = $1", [req.params.patientId]);
-    // Cancel future scheduled billings
     await pool.query("UPDATE scheduled_billings SET status='cancelled' WHERE patient_id = $1 AND status='pending' AND scheduled_date > CURRENT_DATE", [req.params.patientId]);
     res.status(204).end();
   } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }

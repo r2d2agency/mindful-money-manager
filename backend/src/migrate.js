@@ -222,11 +222,23 @@ CREATE TABLE IF NOT EXISTS patient_billing_config (
   patient_id UUID REFERENCES patients(id) ON DELETE CASCADE UNIQUE,
   active BOOLEAN DEFAULT true,
   billing_day INT NOT NULL CHECK (billing_day BETWEEN 1 AND 31),
+  billing_time VARCHAR(5) DEFAULT '09:00',
+  interval_minutes INT DEFAULT 5,
   template_id UUID REFERENCES whatsapp_templates(id) ON DELETE SET NULL,
   instance_id UUID REFERENCES whatsapp_instances(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add billing_time and interval_minutes if missing
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='patient_billing_config' AND column_name='billing_time') THEN
+    ALTER TABLE patient_billing_config ADD COLUMN billing_time VARCHAR(5) DEFAULT '09:00';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='patient_billing_config' AND column_name='interval_minutes') THEN
+    ALTER TABLE patient_billing_config ADD COLUMN interval_minutes INT DEFAULT 5;
+  END IF;
+END $$;
 
 -- Scheduled billings
 CREATE TABLE IF NOT EXISTS scheduled_billings (
@@ -236,12 +248,20 @@ CREATE TABLE IF NOT EXISTS scheduled_billings (
   template_id UUID REFERENCES whatsapp_templates(id) ON DELETE SET NULL,
   instance_id UUID REFERENCES whatsapp_instances(id) ON DELETE SET NULL,
   scheduled_date DATE NOT NULL,
+  scheduled_time VARCHAR(5) DEFAULT '09:00',
   status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed', 'cancelled')),
   sent_at TIMESTAMPTZ,
   error_message TEXT DEFAULT '',
   notes TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add scheduled_time if missing
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='scheduled_billings' AND column_name='scheduled_time') THEN
+    ALTER TABLE scheduled_billings ADD COLUMN scheduled_time VARCHAR(5) DEFAULT '09:00';
+  END IF;
+END $$;
 `;
 
 async function run() {
