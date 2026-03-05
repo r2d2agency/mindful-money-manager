@@ -7,12 +7,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { fetchSessions, fetchPatients, fetchPsychologists } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Loader2, TrendingUp, DollarSign, Users, Calendar } from "lucide-react";
+import { Loader2, TrendingUp, DollarSign, Users, Calendar as CalendarIcon } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { Session, Patient, Psychologist } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const COLORS = ["hsl(199, 89%, 38%)", "hsl(168, 60%, 42%)", "hsl(38, 92%, 50%)", "hsl(0, 72%, 51%)", "hsl(270, 60%, 50%)", "hsl(330, 60%, 50%)"];
+
+function getPeriodRange(period: string): { start: Date; end: Date } {
+  const now = new Date();
+  switch (period) {
+    case "this-month": return { start: startOfMonth(now), end: endOfMonth(now) };
+    case "last-month": return { start: startOfMonth(subMonths(now, 1)), end: endOfMonth(subMonths(now, 1)) };
+    case "last-3": return { start: startOfMonth(subMonths(now, 2)), end: endOfMonth(now) };
+    case "last-6": return { start: startOfMonth(subMonths(now, 5)), end: endOfMonth(now) };
+    case "this-year": return { start: startOfYear(now), end: endOfYear(now) };
+    default: return { start: new Date(2020, 0, 1), end: endOfMonth(now) };
+  }
+}
 
 export default function Reports() {
   const { isAdmin } = useAuth();
@@ -22,7 +40,9 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [filterPsy, setFilterPsy] = useState("all");
   const [filterPatient, setFilterPatient] = useState("all");
-  const [period, setPeriod] = useState("month");
+  const [period, setPeriod] = useState("this-month");
+  const [customFrom, setCustomFrom] = useState<Date | undefined>();
+  const [customTo, setCustomTo] = useState<Date | undefined>();
 
   useEffect(() => {
     Promise.all([fetchSessions(), fetchPatients(), fetchPsychologists()])
@@ -30,13 +50,22 @@ export default function Reports() {
       .finally(() => setLoading(false));
   }, []);
 
+  const dateRange = useMemo(() => {
+    if (period === "custom" && customFrom && customTo) {
+      return { start: customFrom, end: customTo };
+    }
+    return getPeriodRange(period);
+  }, [period, customFrom, customTo]);
+
   const filtered = useMemo(() => {
     return sessions.filter(s => {
       const matchPsy = filterPsy === "all" || s.psychologistId === filterPsy;
       const matchPat = filterPatient === "all" || s.patientId === filterPatient;
-      return matchPsy && matchPat;
+      const d = new Date(s.date);
+      const matchDate = d >= dateRange.start && d <= dateRange.end;
+      return matchPsy && matchPat && matchDate;
     });
-  }, [sessions, filterPsy, filterPatient]);
+  }, [sessions, filterPsy, filterPatient, dateRange]);
 
   // Summary stats
   const totalReceived = filtered.filter(s => s.paymentStatus === "paid").reduce((sum, s) => sum + s.paidAmount, 0);
@@ -131,7 +160,46 @@ export default function Reports() {
           <h1 className="text-2xl font-bold tracking-tight">Relatórios Financeiros</h1>
           <p className="text-muted-foreground">Visão detalhada das finanças da clínica</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-[170px]"><SelectValue placeholder="Período" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="this-month">Este mês</SelectItem>
+              <SelectItem value="last-month">Mês passado</SelectItem>
+              <SelectItem value="last-3">Últimos 3 meses</SelectItem>
+              <SelectItem value="last-6">Últimos 6 meses</SelectItem>
+              <SelectItem value="this-year">Este ano</SelectItem>
+              <SelectItem value="all-time">Todo período</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+          {period === "custom" && (
+            <div className="flex gap-1 items-center">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("w-[120px] justify-start text-left text-xs", !customFrom && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-1 h-3 w-3" />
+                    {customFrom ? format(customFrom, "dd/MM/yy") : "De"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={customFrom} onSelect={setCustomFrom} initialFocus className="p-3 pointer-events-auto" locale={ptBR} />
+                </PopoverContent>
+              </Popover>
+              <span className="text-xs text-muted-foreground">→</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("w-[120px] justify-start text-left text-xs", !customTo && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-1 h-3 w-3" />
+                    {customTo ? format(customTo, "dd/MM/yy") : "Até"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={customTo} onSelect={setCustomTo} initialFocus className="p-3 pointer-events-auto" locale={ptBR} />
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
           {isAdmin && (
             <Select value={filterPsy} onValueChange={setFilterPsy}>
               <SelectTrigger className="w-[180px]"><SelectValue placeholder="Psicólogo" /></SelectTrigger>
