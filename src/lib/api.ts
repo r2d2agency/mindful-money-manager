@@ -112,13 +112,13 @@ export const deleteInvoice = (id: string) =>
 export const fetchCategories = () => request<Category[]>("/categories");
 export const createCategory = (data: { name: string; type: string }) =>
   request<Category>("/categories", { method: "POST", body: JSON.stringify(data) });
+export const deleteCategory = (id: string) =>
+  request<void>(`/categories/${id}`, { method: "DELETE" });
 
 // ===== SETTINGS (branding) =====
 export const fetchSettings = () => request<Record<string, string>>("/settings");
 export const updateSettings = (data: Record<string, string>) =>
   request<Record<string, string>>("/settings", { method: "PUT", body: JSON.stringify(data) });
-export const deleteCategory = (id: string) =>
-  request<void>(`/categories/${id}`, { method: "DELETE" });
 
 // ===== PERSONAL EXPENSES =====
 export const fetchPersonalExpenses = () => request<PersonalExpense[]>("/personal-expenses");
@@ -175,3 +175,27 @@ export const resendWhatsAppMessage = (id: string) =>
   request<any>(`/whatsapp/logs/${id}/resend`, { method: "POST" });
 export const sendWhatsAppBilling = (data: { instanceId: string; templateId: string; patientIds: string[] }) =>
   request<any>("/whatsapp/send-billing", { method: "POST", body: JSON.stringify(data) });
+
+// Multi-message send
+export const sendWhatsAppMulti = (data: { instanceId: string; phone: string; patientId?: string; messages: { type: string; message: string; mediaBase64?: string; delayAfter: number; simulateTyping: boolean }[] }) =>
+  request<any>("/whatsapp/send-multi", { method: "POST", body: JSON.stringify(data) });
+
+// Billing config per patient
+export const fetchBillingConfig = (patientId: string) =>
+  request<any>(`/whatsapp/billing-config/${patientId}`);
+export const updateBillingConfig = (patientId: string, data: { active: boolean; billingDay: number; templateId: string; instanceId: string }) =>
+  request<any>(`/whatsapp/billing-config/${patientId}`, { method: "PUT", body: JSON.stringify(data) });
+export const deleteBillingConfig = (patientId: string) =>
+  request<void>(`/whatsapp/billing-config/${patientId}`, { method: "DELETE" });
+export const fetchAllBillingConfigs = () =>
+  request<any[]>("/whatsapp/billing-config");
+
+// Scheduled billings
+export const fetchScheduledBillings = () =>
+  request<any[]>("/whatsapp/scheduled-billings");
+export const updateScheduledBilling = (id: string, data: any) =>
+  request<any>(`/whatsapp/scheduled-billings/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export const sendScheduledBillingNow = (id: string) =>
+  request<any>(`/whatsapp/scheduled-billings/${id}/send-now`, { method: "POST" });
+export const generateScheduledBillings = () =>
+  request<any>("/whatsapp/generate-scheduled-billings", { method: "POST" });

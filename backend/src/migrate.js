@@ -215,6 +215,33 @@ DO $$ BEGIN
     ALTER TABLE patients ADD COLUMN nickname VARCHAR(100) DEFAULT '';
   END IF;
 END $$;
+
+-- Auto-billing config per patient
+CREATE TABLE IF NOT EXISTS patient_billing_config (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id UUID REFERENCES patients(id) ON DELETE CASCADE UNIQUE,
+  active BOOLEAN DEFAULT true,
+  billing_day INT NOT NULL CHECK (billing_day BETWEEN 1 AND 31),
+  template_id UUID REFERENCES whatsapp_templates(id) ON DELETE SET NULL,
+  instance_id UUID REFERENCES whatsapp_instances(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Scheduled billings
+CREATE TABLE IF NOT EXISTS scheduled_billings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
+  config_id UUID REFERENCES patient_billing_config(id) ON DELETE CASCADE,
+  template_id UUID REFERENCES whatsapp_templates(id) ON DELETE SET NULL,
+  instance_id UUID REFERENCES whatsapp_instances(id) ON DELETE SET NULL,
+  scheduled_date DATE NOT NULL,
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed', 'cancelled')),
+  sent_at TIMESTAMPTZ,
+  error_message TEXT DEFAULT '',
+  notes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 `;
 
 async function run() {
