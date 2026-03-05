@@ -5,6 +5,48 @@ const router = express.Router();
 
 const WAPI_BASE = "https://api.w-api.app/v1";
 
+// Parse multi-step template into individual messages
+function parseTemplateSteps(rawMessage, type, mediaUrl) {
+  const parts = rawMessage.split(/\n---\n/);
+  return parts.map((part, i) => {
+    let text = part.trim();
+    const simulateTyping = /\[digitando\]/i.test(text) || /\[gravando\]/i.test(text);
+    const delayMatch = text.match(/\[esperar\s+(\d+)s?\]/i);
+    const delayAfter = delayMatch ? parseInt(delayMatch[1]) : (i < parts.length - 1 ? 2 : 0);
+    
+    // Extract step-level metadata tags: [tipo:X], [midia:base64...]
+    const typeMatch = text.match(/\[tipo:(\w+)\]/i);
+    const mediaMatch = text.match(/\[midia:(.*?)\]/i);
+    const stepType = typeMatch ? typeMatch[1] : (i === 0 ? type : "text");
+    const stepMedia = mediaMatch ? mediaMatch[1] : (i === 0 ? mediaUrl : "");
+    
+    // Remove all metadata tags from the message text
+    text = text
+      .replace(/\[digitando\]/gi, "")
+      .replace(/\[gravando\]/gi, "")
+      .replace(/\[esperar\s+\d+s?\]/gi, "")
+      .replace(/\[tipo:\w+\]/gi, "")
+      .replace(/\[midia:.*?\]/gi, "")
+      .trim();
+    
+    return { message: text, type: stepType, mediaBase64: stepMedia, delayAfter, simulateTyping };
+  }).filter(s => s.message || s.mediaBase64);
+}
+
+// Send a parsed multi-step template
+async function sendTemplateMessages(instance_id, token, phone, steps) {
+  const results = [];
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    const result = await sendSingleMessage(instance_id, token, phone, step.message, step.type, step.mediaBase64, step.simulateTyping);
+    results.push({ index: i, success: result.ok, data: result.data });
+    if (i < steps.length - 1 && step.delayAfter > 0) {
+      await new Promise(resolve => setTimeout(resolve, step.delayAfter * 1000));
+    }
+  }
+  return results;
+}
+
 // ===== INSTANCES =====
 
 router.post("/instances", requireAdmin, async (req, res) => {
@@ -324,16 +366,25 @@ router.post("/send-billing", requireAdmin, async (req, res) => {
          FROM sessions WHERE patient_id = $1 AND payment_status IN ('pending', 'partial')`, [patientId]);
       const { count, total_due, avg_rate } = sessResult.rows[0];
 
-      const nickname = patient.nickname || patient.name.split(" ")[0];
-      const personalizedMsg = template.message
-        .replace(/\{primeironome\}/gi, patient.name.split(" ")[0])
+      const nickname = billing.nickname || billing.name.split(" ")[0];
+      const personalizedMsg = tmpl.rows[0].message
+        .replace(/\{primeironome\}/gi, billing.name.split(" ")[0])
         .replace(/\{nome\}/gi, nickname)
         .replace(/\{sessoes\}/gi, count)
         .replace(/\{valor_sessao\}/gi, parseFloat(avg_rate).toFixed(2).replace(".", ","))
         .replace(/\{valor_total\}/gi, parseFloat(total_due).toFixed(2).replace(".", ","));
 
-      const result = await sendSingleMessage(instance_id, token, patient.phone, personalizedMsg, template.type, template.media_url, false);
-      const logStatus = result.ok ? "sent" : "failed";
+      const steps = parseTemplateSteps(personalizedMsg, template.type, template.media_url);
+      let allOk = true;
+      for (let si = 0; si < steps.length; si++) {
+        const step = steps[si];
+        const result = await sendSingleMessage(instance_id, token, patient.phone, step.message, step.type, step.mediaBase64, step.simulateTyping);
+        if (!result.ok) allOk = false;
+        if (si < steps.length - 1 && step.delayAfter > 0) {
+          await new Promise(resolve => setTimeout(resolve, step.delayAfter * 1000));
+        }
+      }
+      const logStatus = allOk ? "sent" : "failed";
       await pool.query(
         `INSERT INTO whatsapp_message_logs (patient_id, template_id, instance_id, phone, message, type, status, error_message, sent_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         [patientId, templateId, instanceId, patient.phone.replace(/\D/g, ""), personalizedMsg, template.type, logStatus, result.ok ? "" : JSON.stringify(result.data), result.ok ? new Date() : null]
@@ -484,9 +535,18 @@ router.post("/scheduled-billings/:id/send-now", async (req, res) => {
       .replace(/\{valor_sessao\}/gi, parseFloat(avg_rate).toFixed(2).replace(".", ","))
       .replace(/\{valor_total\}/gi, parseFloat(total_due).toFixed(2).replace(".", ","));
 
-    const result = await sendSingleMessage(inst.rows[0].instance_id, inst.rows[0].token, billing.phone, personalizedMsg, tmpl.rows[0].type, "", false);
+    const steps = parseTemplateSteps(personalizedMsg, tmpl.rows[0].type, "");
+    let allOk = true;
+    for (let si = 0; si < steps.length; si++) {
+      const step = steps[si];
+      const result = await sendSingleMessage(inst.rows[0].instance_id, inst.rows[0].token, billing.phone, step.message, step.type, step.mediaBase64, step.simulateTyping);
+      if (!result.ok) allOk = false;
+      if (si < steps.length - 1 && step.delayAfter > 0) {
+        await new Promise(resolve => setTimeout(resolve, step.delayAfter * 1000));
+      }
+    }
 
-    if (result.ok) {
+    if (allOk) {
       await pool.query("UPDATE scheduled_billings SET status='sent', sent_at=NOW() WHERE id=$1", [req.params.id]);
       await pool.query(
         `INSERT INTO whatsapp_message_logs (patient_id, template_id, instance_id, phone, message, type, status, sent_at) VALUES ($1,$2,$3,$4,$5,$6,'sent',NOW())`,
@@ -494,9 +554,8 @@ router.post("/scheduled-billings/:id/send-now", async (req, res) => {
       );
       res.json({ success: true });
     } else {
-      const errMsg = result.data.message || JSON.stringify(result.data);
-      await pool.query("UPDATE scheduled_billings SET status='failed', error_message=$1 WHERE id=$2", [errMsg, req.params.id]);
-      res.status(400).json({ message: errMsg });
+      await pool.query("UPDATE scheduled_billings SET status='failed', error_message='Falha ao enviar uma ou mais mensagens' WHERE id=$1", [req.params.id]);
+      res.status(400).json({ message: "Falha ao enviar uma ou mais mensagens" });
     }
   } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
 });
