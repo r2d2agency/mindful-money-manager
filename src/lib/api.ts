@@ -151,7 +151,7 @@ export const deleteUser = (id: string) =>
 
 // ===== WHATSAPP =====
 export const fetchWhatsAppInstances = () => request<any[]>("/whatsapp/instances");
-export const createWhatsAppInstance = (data: { instanceName: string; globalToken: string }) =>
+export const createWhatsAppInstance = (data: { instanceName: string; globalToken: string; autoCreate?: boolean; rejectCalls?: boolean; callMessage?: string; manualInstanceId?: string; manualToken?: string }) =>
   request<any>("/whatsapp/instances", { method: "POST", body: JSON.stringify(data) });
 export const deleteWhatsAppInstance = (id: string) =>
   request<void>(`/whatsapp/instances/${id}`, { method: "DELETE" });

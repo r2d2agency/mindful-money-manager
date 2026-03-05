@@ -10,25 +10,37 @@ const WAPI_BASE = "https://api.w-api.app/v1";
 // Create instance via integrator API
 router.post("/instances", requireAdmin, async (req, res) => {
   try {
-    const { instanceName, globalToken, rejectCalls, callMessage } = req.body;
-    if (!instanceName || !globalToken) return res.status(400).json({ message: "instanceName e globalToken são obrigatórios" });
+    const { instanceName, globalToken, autoCreate = true, rejectCalls, callMessage, manualInstanceId, manualToken } = req.body;
+    if (!instanceName) return res.status(400).json({ message: "Nome da conexão é obrigatório" });
 
-    const wapiRes = await fetch(`${WAPI_BASE}/integrator/create-instance`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${globalToken}` },
-      body: JSON.stringify({ instanceName, rejectCalls: rejectCalls || false, callMessage: callMessage || "" }),
-    });
-    const wapiData = await wapiRes.json();
+    if (autoCreate) {
+      if (!globalToken) return res.status(400).json({ message: "Token global é obrigatório para criação automática" });
 
-    if (wapiData.error) return res.status(400).json({ message: wapiData.message || "Erro ao criar instância na W-API" });
+      const wapiRes = await fetch(`${WAPI_BASE}/integrator/create-instance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${globalToken}` },
+        body: JSON.stringify({ instanceName, rejectCalls: rejectCalls || false, callMessage: callMessage || "" }),
+      });
+      const wapiData = await wapiRes.json();
 
-    const result = await pool.query(
-      `INSERT INTO whatsapp_instances (instance_name, instance_id, token, global_token, status)
-       VALUES ($1, $2, $3, $4, 'disconnected') RETURNING *`,
-      [instanceName, wapiData.instanceId, wapiData.token, globalToken]
-    );
+      if (wapiData.error) return res.status(400).json({ message: wapiData.message || "Erro ao criar instância na W-API" });
 
-    res.json(result.rows[0]);
+      const result = await pool.query(
+        `INSERT INTO whatsapp_instances (instance_name, instance_id, token, global_token, status)
+         VALUES ($1, $2, $3, $4, 'disconnected') RETURNING *`,
+        [instanceName, wapiData.instanceId, wapiData.token, globalToken]
+      );
+      res.json(result.rows[0]);
+    } else {
+      if (!manualInstanceId || !manualToken) return res.status(400).json({ message: "Instance ID e Token são obrigatórios" });
+
+      const result = await pool.query(
+        `INSERT INTO whatsapp_instances (instance_name, instance_id, token, global_token, status)
+         VALUES ($1, $2, $3, $4, 'disconnected') RETURNING *`,
+        [instanceName, manualInstanceId, manualToken, globalToken || ""]
+      );
+      res.json(result.rows[0]);
+    }
   } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
 });
 
