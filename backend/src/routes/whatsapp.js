@@ -87,24 +87,54 @@ router.get("/instances/:id/status", async (req, res) => {
     if (!inst.rows.length) return res.status(404).json({ message: "Instância não encontrada" });
     const { instance_id, token } = inst.rows[0];
 
-    const wapiRes = await fetch(`${WAPI_BASE}/instance/status?instanceId=${instance_id}`, {
+    const wapiRes = await fetch(`${WAPI_BASE}/instance/status-instance?instanceId=${instance_id}`, {
       headers: { "Authorization": `Bearer ${token}` },
     });
 
     let data;
     try { data = await wapiRes.json(); } catch { data = {}; }
 
-    console.log("W-API status response:", JSON.stringify(data));
-
-    // W-API pode retornar { connected: true } ou { status: "CONNECTED" } ou { state: "open" }
-    const isConnected = data.connected === true || data.status === "CONNECTED" || data.state === "open";
-    const phone = data.connectedPhone || data.phone || data.me?.user || null;
+    const isConnected = data.connected === true;
+    const phone = data.connectedPhone || data.phone || null;
 
     await pool.query("UPDATE whatsapp_instances SET status = $1, connected_phone = $2 WHERE id = $3",
       [isConnected ? "connected" : "disconnected", phone, req.params.id]);
 
-    res.json({ connected: isConnected, connectedPhone: phone, raw: data, dbStatus: isConnected ? "connected" : "disconnected" });
+    res.json({ connected: isConnected, connectedPhone: phone, dbStatus: isConnected ? "connected" : "disconnected" });
   } catch (err) { console.error("Status error:", err); res.status(500).json({ message: "Erro ao verificar status: " + err.message }); }
+});
+
+// Restart instance
+router.post("/instances/:id/restart", requireAdmin, async (req, res) => {
+  try {
+    const inst = await pool.query("SELECT instance_id, token FROM whatsapp_instances WHERE id = $1", [req.params.id]);
+    if (!inst.rows.length) return res.status(404).json({ message: "Instância não encontrada" });
+    const { instance_id, token } = inst.rows[0];
+
+    const wapiRes = await fetch(`${WAPI_BASE}/instance/restart?instanceId=${instance_id}`, {
+      headers: { "Authorization": `Bearer ${token}` },
+    });
+    const data = await wapiRes.json();
+    res.json(data);
+  } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
+});
+
+// Disconnect instance
+router.post("/instances/:id/disconnect", requireAdmin, async (req, res) => {
+  try {
+    const inst = await pool.query("SELECT instance_id, token FROM whatsapp_instances WHERE id = $1", [req.params.id]);
+    if (!inst.rows.length) return res.status(404).json({ message: "Instância não encontrada" });
+    const { instance_id, token } = inst.rows[0];
+
+    const wapiRes = await fetch(`${WAPI_BASE}/instance/disconnect?instanceId=${instance_id}`, {
+      headers: { "Authorization": `Bearer ${token}` },
+    });
+    const data = await wapiRes.json();
+
+    await pool.query("UPDATE whatsapp_instances SET status = 'disconnected', connected_phone = NULL WHERE id = $1", [req.params.id]);
+    res.json(data);
+  } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
+});
 });
 
 // ===== SEND MESSAGES =====
