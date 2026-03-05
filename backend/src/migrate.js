@@ -171,6 +171,50 @@ INSERT INTO app_settings (key, value) VALUES
   ('sidebar_s', '89'),
   ('sidebar_l', '18')
 ON CONFLICT (key) DO NOTHING;
+
+-- WhatsApp module
+CREATE TABLE IF NOT EXISTS whatsapp_instances (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  instance_name VARCHAR(255) NOT NULL,
+  instance_id VARCHAR(255),
+  token TEXT,
+  global_token TEXT NOT NULL,
+  status VARCHAR(20) DEFAULT 'disconnected' CHECK (status IN ('disconnected', 'connected', 'pending')),
+  connected_phone VARCHAR(50),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS whatsapp_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  type VARCHAR(20) DEFAULT 'text' CHECK (type IN ('text', 'image', 'audio', 'video', 'document')),
+  media_url TEXT DEFAULT '',
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS whatsapp_message_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id UUID REFERENCES patients(id) ON DELETE SET NULL,
+  template_id UUID REFERENCES whatsapp_templates(id) ON DELETE SET NULL,
+  instance_id UUID REFERENCES whatsapp_instances(id) ON DELETE SET NULL,
+  phone VARCHAR(50) NOT NULL,
+  message TEXT NOT NULL,
+  type VARCHAR(20) DEFAULT 'text',
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed', 'scheduled')),
+  error_message TEXT DEFAULT '',
+  scheduled_at TIMESTAMPTZ,
+  sent_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Add nickname to patients for WhatsApp personalization
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='patients' AND column_name='nickname') THEN
+    ALTER TABLE patients ADD COLUMN nickname VARCHAR(100) DEFAULT '';
+  END IF;
+END $$;
 `;
 
 async function run() {

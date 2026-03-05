@@ -15,6 +15,7 @@ import Reports from "@/pages/Reports";
 import UsersPage from "@/pages/Users";
 import SettingsPage from "@/pages/Settings";
 import Login from "@/pages/Login";
+import WhatsAppPage from "@/pages/WhatsApp";
 import NotFound from "./pages/NotFound";
 import { ReactNode } from "react";
 
@@ -49,6 +50,7 @@ const App = () => (
             <Route path="/psicologos" element={<AdminRoute><Psychologists /></AdminRoute>} />
             <Route path="/usuarios" element={<AdminRoute><UsersPage /></AdminRoute>} />
             <Route path="/configuracoes" element={<AdminRoute><SettingsPage /></AdminRoute>} />
+            <Route path="/whatsapp" element={<AdminRoute><WhatsAppPage /></AdminRoute>} />
             <Route path="/relatorios" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/financas" element={<ProtectedRoute><PersonalFinances /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />

@@ -12,6 +12,7 @@ const recurringPlansRoutes = require("./routes/recurringPlans");
 const invoicesRoutes = require("./routes/invoices");
 const categoriesRoutes = require("./routes/categories");
 const settingsRoutes = require("./routes/settings");
+const whatsappRoutes = require("./routes/whatsapp");
 const { authenticate } = require("./middleware/auth");
 
 const app = express();
@@ -36,5 +37,6 @@ app.use("/api/recurring-plans", authenticate, recurringPlansRoutes);
 app.use("/api/invoices", authenticate, invoicesRoutes);
 app.use("/api/categories", authenticate, categoriesRoutes);
 app.use("/api/settings", authenticate, settingsRoutes);
+app.use("/api/whatsapp", authenticate, whatsappRoutes);
 
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));

@@ -148,3 +148,26 @@ export const resetUserPassword = (id: string, password: string) =>
   request<{ message: string }>(`/users/${id}/password`, { method: "PUT", body: JSON.stringify({ password }) });
 export const deleteUser = (id: string) =>
   request<void>(`/users/${id}`, { method: "DELETE" });
+
+// ===== WHATSAPP =====
+export const fetchWhatsAppInstances = () => request<any[]>("/whatsapp/instances");
+export const createWhatsAppInstance = (data: { instanceName: string; globalToken: string }) =>
+  request<any>("/whatsapp/instances", { method: "POST", body: JSON.stringify(data) });
+export const deleteWhatsAppInstance = (id: string) =>
+  request<void>(`/whatsapp/instances/${id}`, { method: "DELETE" });
+export const getWhatsAppQRCode = (id: string) =>
+  request<any>(`/whatsapp/instances/${id}/qrcode`);
+export const getWhatsAppStatus = (id: string) =>
+  request<any>(`/whatsapp/instances/${id}/status`);
+export const fetchWhatsAppTemplates = () => request<any[]>("/whatsapp/templates");
+export const createWhatsAppTemplate = (data: { name: string; message: string; type: string; mediaUrl: string }) =>
+  request<any>("/whatsapp/templates", { method: "POST", body: JSON.stringify(data) });
+export const updateWhatsAppTemplate = (id: string, data: any) =>
+  request<any>(`/whatsapp/templates/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export const deleteWhatsAppTemplate = (id: string) =>
+  request<void>(`/whatsapp/templates/${id}`, { method: "DELETE" });
+export const fetchWhatsAppLogs = () => request<any[]>("/whatsapp/logs");
+export const resendWhatsAppMessage = (id: string) =>
+  request<any>(`/whatsapp/logs/${id}/resend`, { method: "POST" });
+export const sendWhatsAppBilling = (data: { instanceId: string; templateId: string; patientIds: string[] }) =>
+  request<any>("/whatsapp/send-billing", { method: "POST", body: JSON.stringify(data) });
