@@ -135,7 +135,6 @@ router.post("/instances/:id/disconnect", requireAdmin, async (req, res) => {
     res.json(data);
   } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
 });
-});
 
 // ===== SEND MESSAGES =====
 router.post("/send", async (req, res) => {
