@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,10 +13,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   fetchPatients, createPatient, updatePatient, deletePatient,
-  fetchPsychologists, fetchSessions, fetchInvoices, createInvoice
+  fetchPsychologists, fetchSessions, fetchInvoices, createInvoice,
+  fetchBillingConfig, updateBillingConfig, deleteBillingConfig,
+  fetchWhatsAppTemplates, fetchWhatsAppInstances
 } from "@/lib/api";
 import { formatDate, formatCurrency } from "@/lib/format";
-import { Plus, Pencil, Trash2, Search, Loader2, Eye, FileText, Calendar, DollarSign, Download, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Loader2, Eye, FileText, Calendar, DollarSign, Download, Upload, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { Patient, Psychologist, Session, Invoice } from "@/types";
 
@@ -37,10 +40,22 @@ export default function Patients() {
   // Patient detail sheet
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
+  // Billing config
+  const [billingConfig, setBillingConfig] = useState<any>(null);
+  const [billingActive, setBillingActive] = useState(false);
+  const [billingDay, setBillingDay] = useState(5);
+  const [billingTemplateId, setBillingTemplateId] = useState("");
+  const [billingInstanceId, setBillingInstanceId] = useState("");
+  const [waTemplates, setWaTemplates] = useState<any[]>([]);
+  const [waInstances, setWaInstances] = useState<any[]>([]);
+  const [savingBilling, setSavingBilling] = useState(false);
+
   useEffect(() => {
     Promise.all([fetchPatients(), fetchPsychologists(), fetchSessions(), fetchInvoices()])
       .then(([p, psy, s, inv]) => { setPatients(p); setPsychologists(psy); setSessions(s); setInvoices(inv); })
       .finally(() => setLoading(false));
+    fetchWhatsAppTemplates().then(setWaTemplates).catch(() => {});
+    fetchWhatsAppInstances().then(setWaInstances).catch(() => {});
   }, []);
 
   const filtered = patients.filter(p =>
@@ -107,6 +122,41 @@ export default function Patients() {
     } catch (err: any) {
       toast.error(err.message);
     }
+  }
+
+  async function loadBillingConfig(patientId: string) {
+    try {
+      const config = await fetchBillingConfig(patientId);
+      setBillingConfig(config);
+      if (config) {
+        setBillingActive(config.active);
+        setBillingDay(config.billing_day);
+        setBillingTemplateId(config.template_id || "");
+        setBillingInstanceId(config.instance_id || "");
+      } else {
+        setBillingActive(false);
+        setBillingDay(5);
+        setBillingTemplateId("");
+        setBillingInstanceId("");
+      }
+    } catch { setBillingConfig(null); }
+  }
+
+  async function handleSaveBillingConfig() {
+    if (!selectedPatient) return;
+    setSavingBilling(true);
+    try {
+      if (!billingActive && billingConfig) {
+        await deleteBillingConfig(selectedPatient.id);
+        setBillingConfig(null);
+        toast.success("Cobrança automática desativada");
+      } else if (billingActive) {
+        if (!billingTemplateId || !billingInstanceId) { toast.error("Selecione template e instância"); setSavingBilling(false); return; }
+        await updateBillingConfig(selectedPatient.id, { active: true, billingDay: billingDay, templateId: billingTemplateId, instanceId: billingInstanceId });
+        toast.success("Cobrança automática configurada!");
+      }
+    } catch (err: any) { toast.error(err.message); }
+    setSavingBilling(false);
   }
 
   const getPsyName = (id: string) => psychologists.find(p => p.id === id)?.name || "—";
@@ -178,7 +228,7 @@ export default function Patients() {
                   <TableCell>{formatDate(p.createdAt)}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => setSelectedPatient(p)} title="Ver ficha">
+                      <Button variant="ghost" size="icon" onClick={() => { setSelectedPatient(p); loadBillingConfig(p.id); }} title="Ver ficha">
                         <Eye className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
@@ -239,6 +289,9 @@ export default function Patients() {
                   </TabsTrigger>
                   <TabsTrigger value="invoices" className="flex-1">
                     <FileText className="mr-1 h-3 w-3" />Notas ({patientInvoices.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="billing" className="flex-1">
+                    <MessageSquare className="mr-1 h-3 w-3" />Cobrança
                   </TabsTrigger>
                 </TabsList>
 
@@ -358,6 +411,52 @@ export default function Patients() {
                       </div>
                     </div>
                   )}
+                </TabsContent>
+
+                <TabsContent value="billing" className="mt-3 space-y-4">
+                  <div className="flex items-center justify-between border rounded-md p-3">
+                    <div>
+                      <p className="font-medium text-sm">Cobrança Automática</p>
+                      <p className="text-xs text-muted-foreground">Enviar cobrança via WhatsApp automaticamente</p>
+                    </div>
+                    <Switch checked={billingActive} onCheckedChange={setBillingActive} />
+                  </div>
+
+                  {billingActive && (
+                    <div className="space-y-3">
+                      <div>
+                        <Label>Dia do mês para cobrança</Label>
+                        <Input type="number" min={1} max={31} value={billingDay} onChange={e => setBillingDay(parseInt(e.target.value) || 5)} />
+                      </div>
+                      <div>
+                        <Label>Template de mensagem</Label>
+                        <Select value={billingTemplateId} onValueChange={setBillingTemplateId}>
+                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                          <SelectContent>
+                            {waTemplates.filter(t => t.active).map(t => (
+                              <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Instância WhatsApp</Label>
+                        <Select value={billingInstanceId} onValueChange={setBillingInstanceId}>
+                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                          <SelectContent>
+                            {waInstances.filter(i => i.status === "connected").map(i => (
+                              <SelectItem key={i.id} value={i.id}>{i.instance_name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button onClick={handleSaveBillingConfig} disabled={savingBilling} className="w-full">
+                    {savingBilling && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                    Salvar Configuração
+                  </Button>
                 </TabsContent>
               </Tabs>
             </>
