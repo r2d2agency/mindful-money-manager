@@ -72,9 +72,10 @@ export default function WhatsApp() {
   const [templates, setTemplates] = useState<WaTemplate[]>([]);
   const [showNewTemplate, setShowNewTemplate] = useState(false);
   const [tplName, setTplName] = useState("");
-  const [tplMessage, setTplMessage] = useState("");
-  const [tplType, setTplType] = useState("text");
-  const [tplMediaUrl, setTplMediaUrl] = useState("");
+  const [tplSteps, setTplSteps] = useState<MessageStep[]>([
+    { type: "text", message: "", mediaBase64: "", mediaFileName: "", delayAfter: 3, simulateTyping: true }
+  ]);
+  const tplFileRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Logs
   const [logs, setLogs] = useState<WaLog[]>([]);
@@ -166,11 +167,19 @@ export default function WhatsApp() {
 
   // --- Template handlers ---
   async function handleCreateTemplate() {
-    if (!tplName || !tplMessage) return toast.error("Preencha nome e mensagem");
+    if (!tplName) return toast.error("Preencha o nome");
+    if (!tplSteps.length || !tplSteps[0].message) return toast.error("Adicione pelo menos uma mensagem");
     try {
-      await createWhatsAppTemplate({ name: tplName, message: tplMessage, type: tplType, mediaUrl: tplMediaUrl });
+      // Save first step as main template (backend stores single template; steps are serialized in message)
+      const combinedMessage = tplSteps.map((s, i) => {
+        const prefix = s.type !== "text" ? `[${s.type}] ` : "";
+        const delay = i < tplSteps.length - 1 ? ` [esperar ${s.delayAfter}s]` : "";
+        const typing = s.simulateTyping ? (s.type === "audio" ? " [gravando]" : " [digitando]") : "";
+        return `${prefix}${s.message}${typing}${delay}`;
+      }).join("\n---\n");
+      await createWhatsAppTemplate({ name: tplName, message: combinedMessage, type: tplSteps[0].type, mediaUrl: "" });
       toast.success("Template criado!"); setShowNewTemplate(false);
-      setTplName(""); setTplMessage(""); setTplType("text"); setTplMediaUrl("");
+      setTplName(""); setTplSteps([{ type: "text", message: "", mediaBase64: "", mediaFileName: "", delayAfter: 3, simulateTyping: true }]);
       loadTemplates();
     } catch (err: any) { toast.error(err.message); }
   }
@@ -284,7 +293,7 @@ export default function WhatsApp() {
 
   const connectedInstances = instances.filter(i => i.status === "connected");
 
-  const variablesHelp = "{nome} = apelido do paciente\n{sessoes} = nº sessões pendentes\n{valor_sessao} = valor médio por sessão\n{valor_total} = valor total devido";
+  const variablesHelp = "{primeironome} = primeiro nome do paciente\n{sessoes} = nº sessões pendentes\n{valor_sessao} = valor médio por sessão\n{valor_total} = valor total devido";
 
   // Calendar helpers
   const calendarDays = useMemo(() => {
@@ -451,24 +460,73 @@ export default function WhatsApp() {
             ))}
           </div>
           <Dialog open={showNewTemplate} onOpenChange={setShowNewTemplate}>
-            <DialogContent>
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Novo Template</DialogTitle></DialogHeader>
               <div className="space-y-4">
-                <div><Label>Nome</Label><Input value={tplName} onChange={e => setTplName(e.target.value)} /></div>
-                <div><Label>Tipo</Label>
-                  <Select value={tplType} onValueChange={setTplType}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="text">Texto</SelectItem>
-                      <SelectItem value="image">Imagem</SelectItem>
-                      <SelectItem value="audio">Áudio</SelectItem>
-                      <SelectItem value="document">Documento</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div><Label>Mensagem</Label><Textarea value={tplMessage} onChange={e => setTplMessage(e.target.value)} rows={4} /></div>
+                <div><Label>Nome do Template</Label><Input value={tplName} onChange={e => setTplName(e.target.value)} placeholder="Cobrança mensal" /></div>
+                <div className="bg-muted/50 rounded-lg p-3 text-xs font-mono whitespace-pre-wrap">{variablesHelp}</div>
+                
+                <Label className="text-base font-semibold">Mensagens ({tplSteps.length})</Label>
+                {tplSteps.map((step, i) => (
+                  <Card key={i} className="border-l-4 border-l-primary">
+                    <CardContent className="pt-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className="gap-1">{typeIcon(step.type)} Msg {i + 1}</Badge>
+                        {tplSteps.length > 1 && (
+                          <Button size="sm" variant="ghost" onClick={() => setTplSteps(prev => prev.filter((_, idx) => idx !== i))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs">Tipo</Label>
+                          <Select value={step.type} onValueChange={v => setTplSteps(prev => prev.map((s, idx) => idx === i ? { ...s, type: v as any } : s))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="text">📝 Texto</SelectItem>
+                              <SelectItem value="image">🖼️ Imagem</SelectItem>
+                              <SelectItem value="audio">🎤 Áudio</SelectItem>
+                              <SelectItem value="document">📄 Documento</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Esperar após (seg)</Label>
+                          <Input type="number" min={0} value={step.delayAfter} onChange={e => setTplSteps(prev => prev.map((s, idx) => idx === i ? { ...s, delayAfter: parseInt(e.target.value) || 0 } : s))} />
+                        </div>
+                      </div>
+                      {step.type !== "audio" && (
+                        <div>
+                          <Label className="text-xs">{step.type === "text" ? "Mensagem" : "Legenda"}</Label>
+                          <Textarea value={step.message} onChange={e => setTplSteps(prev => prev.map((s, idx) => idx === i ? { ...s, message: e.target.value } : s))} rows={3} placeholder="Olá {primeironome}, você tem {sessoes} sessões..." />
+                        </div>
+                      )}
+                      {step.type !== "text" && (
+                        <div>
+                          <Label className="text-xs">Arquivo</Label>
+                          <div className="flex items-center gap-2">
+                            <input type="file" ref={el => { tplFileRefs.current[i] = el; }} className="hidden" accept={fileAccept(step.type)} onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 10 * 1024 * 1024) { toast.error("Máximo 10MB"); return; }
+                              const reader = new FileReader();
+                              reader.onload = () => setTplSteps(prev => prev.map((s, idx) => idx === i ? { ...s, mediaBase64: reader.result as string, mediaFileName: file.name } : s));
+                              reader.readAsDataURL(file);
+                            }} />
+                            <Button variant="outline" size="sm" onClick={() => tplFileRefs.current[i]?.click()}><Upload className="h-4 w-4 mr-1" /> Carregar</Button>
+                            {step.mediaFileName && <span className="text-xs text-muted-foreground truncate max-w-[200px]">📎 {step.mediaFileName}</span>}
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <Checkbox checked={step.simulateTyping} onCheckedChange={c => setTplSteps(prev => prev.map((s, idx) => idx === i ? { ...s, simulateTyping: !!c } : s))} />
+                        <Label className="text-xs cursor-pointer">{step.type === "audio" ? "🎙️ Gravando áudio" : "⌨️ Digitando"}</Label>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                <Button variant="outline" className="w-full" onClick={() => setTplSteps(prev => [...prev, { type: "text", message: "", mediaBase64: "", mediaFileName: "", delayAfter: 3, simulateTyping: true }])}><Plus className="h-4 w-4 mr-1" /> Adicionar Mensagem</Button>
               </div>
-              <DialogFooter><Button onClick={handleCreateTemplate}><Plus className="h-4 w-4 mr-1" /> Criar</Button></DialogFooter>
+              <DialogFooter><Button onClick={handleCreateTemplate}><Plus className="h-4 w-4 mr-1" /> Criar Template</Button></DialogFooter>
             </DialogContent>
           </Dialog>
         </TabsContent>
