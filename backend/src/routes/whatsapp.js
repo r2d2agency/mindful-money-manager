@@ -326,6 +326,7 @@ router.post("/send-billing", requireAdmin, async (req, res) => {
 
       const nickname = patient.nickname || patient.name.split(" ")[0];
       const personalizedMsg = template.message
+        .replace(/\{primeironome\}/gi, patient.name.split(" ")[0])
         .replace(/\{nome\}/gi, nickname)
         .replace(/\{sessoes\}/gi, count)
         .replace(/\{valor_sessao\}/gi, parseFloat(avg_rate).toFixed(2).replace(".", ","))
@@ -443,6 +444,7 @@ router.post("/scheduled-billings/:id/send-now", async (req, res) => {
 
     const nickname = billing.nickname || billing.name.split(" ")[0];
     const personalizedMsg = tmpl.rows[0].message
+      .replace(/\{primeironome\}/gi, billing.name.split(" ")[0])
       .replace(/\{nome\}/gi, nickname)
       .replace(/\{sessoes\}/gi, count)
       .replace(/\{valor_sessao\}/gi, parseFloat(avg_rate).toFixed(2).replace(".", ","))
