@@ -183,7 +183,7 @@ export const sendWhatsAppMulti = (data: { instanceId: string; phone: string; pat
 // Billing config per patient
 export const fetchBillingConfig = (patientId: string) =>
   request<any>(`/whatsapp/billing-config/${patientId}`);
-export const updateBillingConfig = (patientId: string, data: { active: boolean; billingDay: number; templateId: string; instanceId: string }) =>
+export const updateBillingConfig = (patientId: string, data: { active: boolean; billingDay: number; billingTime: string; intervalMinutes: number; templateId: string; instanceId: string }) =>
   request<any>(`/whatsapp/billing-config/${patientId}`, { method: "PUT", body: JSON.stringify(data) });
 export const deleteBillingConfig = (patientId: string) =>
   request<void>(`/whatsapp/billing-config/${patientId}`, { method: "DELETE" });
