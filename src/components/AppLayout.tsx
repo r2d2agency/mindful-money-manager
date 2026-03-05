@@ -6,7 +6,7 @@ import {
   SidebarMenuItem, SidebarProvider, SidebarInset, SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Users, Calendar, UserCog, Wallet, Brain, LogOut, BarChart3, Shield, Settings, MoreHorizontal } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, UserCog, Wallet, Brain, LogOut, BarChart3, Shield, Settings, MoreHorizontal, MessageSquare } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranding } from "@/contexts/BrandingContext";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -21,6 +21,7 @@ const clinicMenu = [
   { title: "Psicólogos", icon: UserCog, path: "/psicologos", adminOnly: true },
   { title: "Usuários", icon: Shield, path: "/usuarios", adminOnly: true },
   { title: "Configurações", icon: Settings, path: "/configuracoes", adminOnly: true },
+  { title: "WhatsApp", icon: MessageSquare, path: "/whatsapp", adminOnly: true },
 ];
 
 const personalMenu = [
