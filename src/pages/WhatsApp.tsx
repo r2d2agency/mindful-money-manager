@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import {
   fetchWhatsAppInstances, createWhatsAppInstance, deleteWhatsAppInstance,
-  getWhatsAppQRCode, getWhatsAppStatus,
+  getWhatsAppQRCode, getWhatsAppStatus, restartWhatsAppInstance, disconnectWhatsAppInstance,
   fetchWhatsAppTemplates, createWhatsAppTemplate, updateWhatsAppTemplate, deleteWhatsAppTemplate,
   fetchWhatsAppLogs, resendWhatsAppMessage, sendWhatsAppBilling,
   fetchPatients
@@ -138,6 +138,15 @@ export default function WhatsApp() {
     } catch (err: any) { toast.error(err.message); }
   }
 
+  async function handleRestart(id: string) {
+    try { await restartWhatsAppInstance(id); toast.success("Instância reiniciada!"); loadInstances(); } catch (err: any) { toast.error(err.message); }
+  }
+
+  async function handleDisconnect(id: string) {
+    if (!confirm("Desconectar esta instância?")) return;
+    try { await disconnectWhatsAppInstance(id); toast.success("Desconectada!"); loadInstances(); } catch (err: any) { toast.error(err.message); }
+  }
+
   async function handleDeleteInstance(id: string) {
     if (!confirm("Tem certeza?")) return;
     try { await deleteWhatsAppInstance(id); loadInstances(); toast.success("Removida"); } catch (err: any) { toast.error(err.message); }
@@ -229,9 +238,19 @@ export default function WhatsApp() {
                     <RefreshCw className="h-4 w-4 mr-1" /> Status
                   </Button>
                   {isAdmin && (
-                    <Button size="sm" variant="destructive" onClick={() => handleDeleteInstance(inst.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => handleRestart(inst.id)}>
+                        <RotateCcw className="h-4 w-4 mr-1" /> Reiniciar
+                      </Button>
+                      {inst.status === "connected" && (
+                        <Button size="sm" variant="secondary" onClick={() => handleDisconnect(inst.id)}>
+                          <WifiOff className="h-4 w-4 mr-1" /> Desconectar
+                        </Button>
+                      )}
+                      <Button size="sm" variant="destructive" onClick={() => handleDeleteInstance(inst.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
                   )}
                 </CardContent>
               </Card>

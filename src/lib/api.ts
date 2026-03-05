@@ -159,6 +159,10 @@ export const getWhatsAppQRCode = (id: string) =>
   request<any>(`/whatsapp/instances/${id}/qrcode`);
 export const getWhatsAppStatus = (id: string) =>
   request<any>(`/whatsapp/instances/${id}/status`);
+export const restartWhatsAppInstance = (id: string) =>
+  request<any>(`/whatsapp/instances/${id}/restart`, { method: "POST" });
+export const disconnectWhatsAppInstance = (id: string) =>
+  request<any>(`/whatsapp/instances/${id}/disconnect`, { method: "POST" });
 export const fetchWhatsAppTemplates = () => request<any[]>("/whatsapp/templates");
 export const createWhatsAppTemplate = (data: { name: string; message: string; type: string; mediaUrl: string }) =>
   request<any>("/whatsapp/templates", { method: "POST", body: JSON.stringify(data) });
