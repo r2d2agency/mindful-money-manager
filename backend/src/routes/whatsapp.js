@@ -67,16 +67,16 @@ router.get("/instances/:id/qrcode", requireAdmin, async (req, res) => {
     if (!inst.rows.length) return res.status(404).json({ message: "Instância não encontrada" });
     const { instance_id, token } = inst.rows[0];
 
-    const wapiRes = await fetch(`${WAPI_BASE}/instance/qr-code?instanceId=${instance_id}&image=disable`, {
+    const wapiRes = await fetch(`${WAPI_BASE}/instance/qr-code?instanceId=${instance_id}`, {
       headers: { "Authorization": `Bearer ${token}` },
     });
     const data = await wapiRes.json();
 
-    if (data.error === false && data.qrcode) {
+    if (data.error === false && (data.qrcode || data.base64)) {
       await pool.query("UPDATE whatsapp_instances SET status = 'pending' WHERE id = $1", [req.params.id]);
     }
 
-    res.json(data);
+    res.json({ ...data, qrcode: data.base64 || data.qrcode });
   } catch (err) { console.error(err); res.status(500).json({ message: "Erro interno" }); }
 });
 
