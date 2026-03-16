@@ -798,11 +798,31 @@ export default function Sessions() {
                             <span className="text-success ml-2">(pago: {formatCurrency(s.paidAmount)})</span>
                           )}
                         </div>
-                        {s.paymentStatus !== "paid" && s.status !== "cancelled" && (
-                          <Button size="sm" variant="outline" onClick={() => { setDayDetailOpen(false); openPayDialog(s); }}>
-                            <CheckCircle className="mr-1 h-3 w-3 text-success" />Baixar
-                          </Button>
-                        )}
+                        <div className="flex gap-1">
+                          {s.status === "scheduled" && (
+                            <>
+                              <Button size="sm" variant="outline" className="text-xs h-7" onClick={async () => {
+                                await updateSession(s.id, { status: "completed" });
+                                setSessions(await fetchSessions());
+                                toast.success("Sessão marcada como realizada");
+                              }}>
+                                <CheckCircle className="mr-1 h-3 w-3 text-success" />Compareceu
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-xs h-7" onClick={async () => {
+                                await updateSession(s.id, { status: "cancelled" });
+                                setSessions(await fetchSessions());
+                                toast.success("Sessão cancelada");
+                              }}>
+                                <XCircle className="mr-1 h-3 w-3 text-destructive" />Cancelar
+                              </Button>
+                            </>
+                          )}
+                          {s.paymentStatus !== "paid" && s.status !== "cancelled" && (
+                            <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => { setDayDetailOpen(false); openPayDialog(s); }}>
+                              <DollarSign className="mr-1 h-3 w-3 text-warning" />Baixa
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       {s.invoiceId && (
                         <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
