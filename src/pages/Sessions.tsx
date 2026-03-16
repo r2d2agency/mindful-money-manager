@@ -16,7 +16,7 @@ import {
   deleteRecurringPlan, generateRecurringSessions, fetchInvoices, createInvoice, deleteInvoice
 } from "@/lib/api";
 import { formatCurrency, formatDate, DAYS_OF_WEEK } from "@/lib/format";
-import { Plus, Trash2, CheckCircle, Search, Loader2, RefreshCw, ChevronLeft, ChevronRight, FileText, Calendar as CalendarIcon, Upload, Download } from "lucide-react";
+import { Plus, Trash2, CheckCircle, Search, Loader2, RefreshCw, ChevronLeft, ChevronRight, FileText, Calendar as CalendarIcon, Upload, Download, DollarSign, XCircle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -504,8 +504,8 @@ export default function Sessions() {
               {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Data início"}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <CalendarPicker mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} />
+          <PopoverContent className="w-auto p-0 z-50" align="start">
+            <CalendarPicker mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); }} initialFocus className={cn("p-3 pointer-events-auto")} />
           </PopoverContent>
         </Popover>
         <Popover>
@@ -515,8 +515,8 @@ export default function Sessions() {
               {dateTo ? format(dateTo, "dd/MM/yyyy") : "Data fim"}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <CalendarPicker mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className={cn("p-3 pointer-events-auto")} />
+          <PopoverContent className="w-auto p-0 z-50" align="start">
+            <CalendarPicker mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); }} initialFocus className={cn("p-3 pointer-events-auto")} />
           </PopoverContent>
         </Popover>
         {(dateFrom || dateTo) && (
@@ -798,11 +798,31 @@ export default function Sessions() {
                             <span className="text-success ml-2">(pago: {formatCurrency(s.paidAmount)})</span>
                           )}
                         </div>
-                        {s.paymentStatus !== "paid" && s.status !== "cancelled" && (
-                          <Button size="sm" variant="outline" onClick={() => { setDayDetailOpen(false); openPayDialog(s); }}>
-                            <CheckCircle className="mr-1 h-3 w-3 text-success" />Baixar
-                          </Button>
-                        )}
+                        <div className="flex gap-1">
+                          {s.status === "scheduled" && (
+                            <>
+                              <Button size="sm" variant="outline" className="text-xs h-7" onClick={async () => {
+                                await updateSession(s.id, { status: "completed" });
+                                setSessions(await fetchSessions());
+                                toast.success("Sessão marcada como realizada");
+                              }}>
+                                <CheckCircle className="mr-1 h-3 w-3 text-success" />Compareceu
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-xs h-7" onClick={async () => {
+                                await updateSession(s.id, { status: "cancelled" });
+                                setSessions(await fetchSessions());
+                                toast.success("Sessão cancelada");
+                              }}>
+                                <XCircle className="mr-1 h-3 w-3 text-destructive" />Cancelar
+                              </Button>
+                            </>
+                          )}
+                          {s.paymentStatus !== "paid" && s.status !== "cancelled" && (
+                            <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => { setDayDetailOpen(false); openPayDialog(s); }}>
+                              <DollarSign className="mr-1 h-3 w-3 text-warning" />Baixa
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       {s.invoiceId && (
                         <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
@@ -831,7 +851,7 @@ export default function Sessions() {
                      <TableHead>Data</TableHead><TableHead>Horário</TableHead><TableHead>Duração</TableHead>
                      <TableHead>Paciente</TableHead><TableHead>Psicólogo</TableHead>
                      <TableHead>Status</TableHead><TableHead>Pagamento</TableHead><TableHead>Valor</TableHead>
-                     <TableHead className="w-[100px]">Ações</TableHead>
+                     <TableHead className="w-[180px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -858,12 +878,32 @@ export default function Sessions() {
                       <TableCell><div className="text-sm">{formatCurrency(s.paidAmount)} / {formatCurrency(s.expectedAmount)}</div></TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          {s.paymentStatus !== "paid" && (
-                            <Button variant="ghost" size="icon" onClick={() => openPayDialog(s)} title="Baixar pagamento">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
+                          {s.status === "scheduled" && (
+                            <>
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" title="Compareceu"
+                                onClick={async () => {
+                                  await updateSession(s.id, { status: "completed" });
+                                  setSessions(await fetchSessions());
+                                  toast.success("Sessão marcada como realizada");
+                                }}>
+                                <CheckCircle className="h-3.5 w-3.5 text-success mr-1" />Compareceu
+                              </Button>
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" title="Cancelar"
+                                onClick={async () => {
+                                  await updateSession(s.id, { status: "cancelled" });
+                                  setSessions(await fetchSessions());
+                                  toast.success("Sessão cancelada");
+                                }}>
+                                <Trash2 className="h-3.5 w-3.5 text-destructive mr-1" />Cancelar
+                              </Button>
+                            </>
+                          )}
+                          {s.paymentStatus !== "paid" && s.status !== "cancelled" && (
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => openPayDialog(s)} title="Dar baixa">
+                              <DollarSign className="h-3.5 w-3.5 text-warning mr-1" />Baixa
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>

@@ -164,17 +164,33 @@ export default function Dashboard() {
 
   const selectedPatientName = filterPatient === "all" ? null : patients.find(p => p.id === filterPatient)?.name;
 
+  // Overdue filter states
+  const [overdueMonthFilter, setOverdueMonthFilter] = useState("all");
+  const [showAllOverdue, setShowAllOverdue] = useState(false);
+
   // Alerts: overdue sessions
-  const overdueAlerts = useMemo(() => {
+  const allOverdue = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];
     return sessions
       .filter(s => {
         const matchPatient = filterPatient === "all" || s.patientId === filterPatient;
-        return matchPatient && s.date < today && s.paymentStatus !== "paid" && s.status !== "cancelled" && s.paidAmount < s.expectedAmount;
+        const matchMonth = overdueMonthFilter === "all" || s.date.startsWith(overdueMonthFilter);
+        return matchPatient && matchMonth && s.date < today && s.paymentStatus !== "paid" && s.status !== "cancelled" && s.paidAmount < s.expectedAmount;
       })
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 10);
-  }, [sessions, filterPatient]);
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [sessions, filterPatient, overdueMonthFilter]);
+
+  const overdueAlerts = showAllOverdue ? allOverdue : allOverdue.slice(0, 10);
+
+  const overdueMonths = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    const months = new Set<string>();
+    sessions.filter(s => s.date < today && s.paymentStatus !== "paid" && s.status !== "cancelled" && s.paidAmount < s.expectedAmount)
+      .forEach(s => months.add(s.date.substring(0, 7)));
+    return Array.from(months).sort().reverse();
+  }, [sessions]);
+
+  const totalOverdueAmount = allOverdue.reduce((sum, s) => sum + (s.expectedAmount - s.paidAmount), 0);
 
   // Upcoming sessions today/tomorrow
   const upcomingToday = useMemo(() => {
@@ -284,16 +300,31 @@ export default function Dashboard() {
       {/* Alerts */}
       {(overdueAlerts.length > 0 || upcomingToday.length > 0) && (
         <div className="grid gap-4 lg:grid-cols-2">
-          {overdueAlerts.length > 0 && (
+          {allOverdue.length > 0 && (
             <Card className="border-warning/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2 text-warning">
-                  <AlertTriangle className="h-4 w-4" />
-                  Pagamentos Vencidos ({overdueAlerts.length})
-                </CardTitle>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle className="text-base flex items-center gap-2 text-warning">
+                    <AlertTriangle className="h-4 w-4" />
+                    Pagamentos Vencidos ({allOverdue.length}) — {formatCurrency(totalOverdueAmount)}
+                  </CardTitle>
+                  <Select value={overdueMonthFilter} onValueChange={setOverdueMonthFilter}>
+                    <SelectTrigger className="w-[150px] h-8 text-xs">
+                      <SelectValue placeholder="Filtrar mês" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os meses</SelectItem>
+                      {overdueMonths.map(m => {
+                        const [y, mo] = m.split("-");
+                        const label = new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+                        return <SelectItem key={m} value={m}>{label}</SelectItem>;
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
                   {overdueAlerts.map(s => (
                     <div
                       key={s.id}
@@ -335,6 +366,11 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
+                {allOverdue.length > 10 && (
+                  <Button variant="ghost" size="sm" className="w-full mt-2 text-xs" onClick={() => setShowAllOverdue(!showAllOverdue)}>
+                    {showAllOverdue ? "Mostrar menos" : `Ver todos (${allOverdue.length})`}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
