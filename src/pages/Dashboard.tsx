@@ -300,16 +300,31 @@ export default function Dashboard() {
       {/* Alerts */}
       {(overdueAlerts.length > 0 || upcomingToday.length > 0) && (
         <div className="grid gap-4 lg:grid-cols-2">
-          {overdueAlerts.length > 0 && (
+          {allOverdue.length > 0 && (
             <Card className="border-warning/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2 text-warning">
-                  <AlertTriangle className="h-4 w-4" />
-                  Pagamentos Vencidos ({overdueAlerts.length})
-                </CardTitle>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle className="text-base flex items-center gap-2 text-warning">
+                    <AlertTriangle className="h-4 w-4" />
+                    Pagamentos Vencidos ({allOverdue.length}) — {formatCurrency(totalOverdueAmount)}
+                  </CardTitle>
+                  <Select value={overdueMonthFilter} onValueChange={setOverdueMonthFilter}>
+                    <SelectTrigger className="w-[150px] h-8 text-xs">
+                      <SelectValue placeholder="Filtrar mês" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os meses</SelectItem>
+                      {overdueMonths.map(m => {
+                        const [y, mo] = m.split("-");
+                        const label = new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+                        return <SelectItem key={m} value={m}>{label}</SelectItem>;
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
                   {overdueAlerts.map(s => (
                     <div
                       key={s.id}
