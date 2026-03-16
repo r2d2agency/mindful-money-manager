@@ -831,7 +831,7 @@ export default function Sessions() {
                      <TableHead>Data</TableHead><TableHead>Horário</TableHead><TableHead>Duração</TableHead>
                      <TableHead>Paciente</TableHead><TableHead>Psicólogo</TableHead>
                      <TableHead>Status</TableHead><TableHead>Pagamento</TableHead><TableHead>Valor</TableHead>
-                     <TableHead className="w-[100px]">Ações</TableHead>
+                     <TableHead className="w-[180px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
