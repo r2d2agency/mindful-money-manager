@@ -112,6 +112,7 @@ export default function WhatsApp() {
     loadLogs();
     fetchPatients().then(setPatients).catch(() => {});
     loadScheduledBillings();
+    return () => { stopQrPolling(); };
   }, []);
 
   async function loadInstances() { try { setInstances(await fetchWhatsAppInstances()); } catch {} }
