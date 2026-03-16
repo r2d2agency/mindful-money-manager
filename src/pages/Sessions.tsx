@@ -858,12 +858,32 @@ export default function Sessions() {
                       <TableCell><div className="text-sm">{formatCurrency(s.paidAmount)} / {formatCurrency(s.expectedAmount)}</div></TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          {s.paymentStatus !== "paid" && (
-                            <Button variant="ghost" size="icon" onClick={() => openPayDialog(s)} title="Baixar pagamento">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
+                          {s.status === "scheduled" && (
+                            <>
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" title="Compareceu"
+                                onClick={async () => {
+                                  await updateSession(s.id, { status: "completed" });
+                                  setSessions(await fetchSessions());
+                                  toast.success("Sessão marcada como realizada");
+                                }}>
+                                <CheckCircle className="h-3.5 w-3.5 text-success mr-1" />Compareceu
+                              </Button>
+                              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" title="Cancelar"
+                                onClick={async () => {
+                                  await updateSession(s.id, { status: "cancelled" });
+                                  setSessions(await fetchSessions());
+                                  toast.success("Sessão cancelada");
+                                }}>
+                                <Trash2 className="h-3.5 w-3.5 text-destructive mr-1" />Cancelar
+                              </Button>
+                            </>
+                          )}
+                          {s.paymentStatus !== "paid" && s.status !== "cancelled" && (
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => openPayDialog(s)} title="Dar baixa">
+                              <DollarSign className="h-3.5 w-3.5 text-warning mr-1" />Baixa
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
