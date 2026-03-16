@@ -411,16 +411,28 @@ export default function WhatsApp() {
           </div>
 
           {/* QR Code modal */}
-          <Dialog open={!!qrCode || qrLoading} onOpenChange={() => { setQrCode(null); setQrLoading(false); }}>
+          <Dialog open={!!qrCode || qrLoading} onOpenChange={(open) => { if (!open) { stopQrPolling(); setQrCode(null); setQrLoading(false); } }}>
             <DialogContent>
               <DialogHeader><DialogTitle>QR Code WhatsApp</DialogTitle></DialogHeader>
-              <div className="flex justify-center py-4">
+              <div className="flex flex-col items-center gap-3 py-4">
                 {qrLoading ? <Loader2 className="h-12 w-12 animate-spin" /> :
-                 qrCode ? <img src={qrCode} alt="QR Code" className="max-w-[280px]" /> :
-                 <p>QR code não disponível</p>}
+                 qrCode ? (
+                  <>
+                    <img src={qrCode} alt="QR Code" className="max-w-[280px]" />
+                    <p className="text-sm text-muted-foreground animate-pulse flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Aguardando leitura do QR Code...
+                    </p>
+                  </>
+                 ) : <p>QR code não disponível</p>}
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => qrInstanceId && handleGetQR(qrInstanceId)}><RefreshCw className="h-4 w-4 mr-1" /> Atualizar</Button>
+                <Button variant="outline" onClick={() => qrInstanceId && handleGetQR(qrInstanceId)}><RefreshCw className="h-4 w-4 mr-1" /> Atualizar QR</Button>
+                {qrInstanceId && (
+                  <Button variant="outline" onClick={() => { handleRestart(qrInstanceId!); setTimeout(() => handleGetQR(qrInstanceId!), 3000); }}>
+                    <RotateCcw className="h-4 w-4 mr-1" /> Reiniciar e Reconectar
+                  </Button>
+                )}
               </DialogFooter>
             </DialogContent>
           </Dialog>
