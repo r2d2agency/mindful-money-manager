@@ -164,17 +164,33 @@ export default function Dashboard() {
 
   const selectedPatientName = filterPatient === "all" ? null : patients.find(p => p.id === filterPatient)?.name;
 
+  // Overdue filter states
+  const [overdueMonthFilter, setOverdueMonthFilter] = useState("all");
+  const [showAllOverdue, setShowAllOverdue] = useState(false);
+
   // Alerts: overdue sessions
-  const overdueAlerts = useMemo(() => {
+  const allOverdue = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];
     return sessions
       .filter(s => {
         const matchPatient = filterPatient === "all" || s.patientId === filterPatient;
-        return matchPatient && s.date < today && s.paymentStatus !== "paid" && s.status !== "cancelled" && s.paidAmount < s.expectedAmount;
+        const matchMonth = overdueMonthFilter === "all" || s.date.startsWith(overdueMonthFilter);
+        return matchPatient && matchMonth && s.date < today && s.paymentStatus !== "paid" && s.status !== "cancelled" && s.paidAmount < s.expectedAmount;
       })
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 10);
-  }, [sessions, filterPatient]);
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [sessions, filterPatient, overdueMonthFilter]);
+
+  const overdueAlerts = showAllOverdue ? allOverdue : allOverdue.slice(0, 10);
+
+  const overdueMonths = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    const months = new Set<string>();
+    sessions.filter(s => s.date < today && s.paymentStatus !== "paid" && s.status !== "cancelled" && s.paidAmount < s.expectedAmount)
+      .forEach(s => months.add(s.date.substring(0, 7)));
+    return Array.from(months).sort().reverse();
+  }, [sessions]);
+
+  const totalOverdueAmount = allOverdue.reduce((sum, s) => sum + (s.expectedAmount - s.paidAmount), 0);
 
   // Upcoming sessions today/tomorrow
   const upcomingToday = useMemo(() => {
