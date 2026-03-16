@@ -135,13 +135,33 @@ export default function WhatsApp() {
     setCreatingInstance(false);
   }
 
+  const qrPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function stopQrPolling() {
+    if (qrPollingRef.current) { clearInterval(qrPollingRef.current); qrPollingRef.current = null; }
+  }
+
   async function handleGetQR(id: string) {
     setQrLoading(true); setQrInstanceId(id); setQrCode(null);
+    stopQrPolling();
     try {
       const data = await getWhatsAppQRCode(id);
       const qr = data.qrcode || data.base64;
-      if (qr) { setQrCode(qr.startsWith("data:") ? qr : `data:image/png;base64,${qr}`); }
-      else { toast.error("QR code não disponível"); }
+      if (qr) {
+        setQrCode(qr.startsWith("data:") ? qr : `data:image/png;base64,${qr}`);
+        // Start polling status every 5s
+        qrPollingRef.current = setInterval(async () => {
+          try {
+            const status = await getWhatsAppStatus(id);
+            if (status.connected) {
+              stopQrPolling();
+              setQrCode(null); setQrLoading(false);
+              toast.success(`WhatsApp conectado! (${status.connectedPhone || ""})`);
+              loadInstances();
+            }
+          } catch {}
+        }, 5000);
+      } else { toast.error("QR code não disponível. Tente reiniciar a instância primeiro."); }
     } catch (err: any) { toast.error(err.message); }
     setQrLoading(false);
   }
