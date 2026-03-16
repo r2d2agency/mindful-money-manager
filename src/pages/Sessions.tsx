@@ -16,7 +16,7 @@ import {
   deleteRecurringPlan, generateRecurringSessions, fetchInvoices, createInvoice, deleteInvoice
 } from "@/lib/api";
 import { formatCurrency, formatDate, DAYS_OF_WEEK } from "@/lib/format";
-import { Plus, Trash2, CheckCircle, Search, Loader2, RefreshCw, ChevronLeft, ChevronRight, FileText, Calendar as CalendarIcon, Upload, Download } from "lucide-react";
+import { Plus, Trash2, CheckCircle, Search, Loader2, RefreshCw, ChevronLeft, ChevronRight, FileText, Calendar as CalendarIcon, Upload, Download, DollarSign, XCircle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { format } from "date-fns";
