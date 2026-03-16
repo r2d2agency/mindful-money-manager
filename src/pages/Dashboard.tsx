@@ -366,6 +366,11 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
+                {allOverdue.length > 10 && (
+                  <Button variant="ghost" size="sm" className="w-full mt-2 text-xs" onClick={() => setShowAllOverdue(!showAllOverdue)}>
+                    {showAllOverdue ? "Mostrar menos" : `Ver todos (${allOverdue.length})`}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}

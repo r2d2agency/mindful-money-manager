@@ -504,8 +504,8 @@ export default function Sessions() {
               {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Data início"}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <CalendarPicker mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className={cn("p-3 pointer-events-auto")} />
+          <PopoverContent className="w-auto p-0 z-50" align="start">
+            <CalendarPicker mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); }} initialFocus className={cn("p-3 pointer-events-auto")} />
           </PopoverContent>
         </Popover>
         <Popover>
@@ -515,8 +515,8 @@ export default function Sessions() {
               {dateTo ? format(dateTo, "dd/MM/yyyy") : "Data fim"}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <CalendarPicker mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className={cn("p-3 pointer-events-auto")} />
+          <PopoverContent className="w-auto p-0 z-50" align="start">
+            <CalendarPicker mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); }} initialFocus className={cn("p-3 pointer-events-auto")} />
           </PopoverContent>
         </Popover>
         {(dateFrom || dateTo) && (
