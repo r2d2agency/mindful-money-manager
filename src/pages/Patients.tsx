@@ -18,6 +18,7 @@ import {
   fetchWhatsAppTemplates, fetchWhatsAppInstances
 } from "@/lib/api";
 import { formatDate, formatCurrency } from "@/lib/format";
+import { exportToXlsx } from "@/lib/export";
 import { Plus, Pencil, Trash2, Search, Loader2, Eye, FileText, Calendar, DollarSign, Download, Upload, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { Patient, Psychologist, Session, Invoice } from "@/types";
@@ -176,10 +177,23 @@ export default function Patients() {
           <h1 className="text-2xl font-bold tracking-tight">Pacientes</h1>
           <p className="text-muted-foreground">Gerencie os pacientes da clínica</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openNew}><Plus className="mr-2 h-4 w-4" />Novo Paciente</Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => {
+            const data = filtered.map(p => ({
+              Nome: p.name,
+              Email: p.email,
+              Telefone: p.phone,
+              Psicólogo: psychologists.find(ps => ps.id === p.psychologistId)?.name || "",
+              Observações: p.notes,
+              "Criado em": formatDate(p.createdAt),
+            }));
+            exportToXlsx(data, "pacientes");
+            toast.success("Planilha exportada!");
+          }}><Download className="mr-2 h-4 w-4" />Exportar</Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={openNew}><Plus className="mr-2 h-4 w-4" />Novo Paciente</Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Editar Paciente" : "Novo Paciente"}</DialogTitle></DialogHeader>
             <div className="space-y-4">
@@ -203,6 +217,7 @@ export default function Patients() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Card>
