@@ -217,6 +217,7 @@ export default function Patients() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Card>
