@@ -22,6 +22,7 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { exportToXlsx } from "@/lib/export";
 import { toast } from "sonner";
 import { Session, Patient, Psychologist, RecurringPlan, Invoice } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -408,6 +409,23 @@ export default function Sessions() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Button variant="outline" onClick={() => {
+            const data = filtered.map(s => ({
+              Paciente: patients.find(p => p.id === s.patientId)?.name || "",
+              Psicólogo: psychologists.find(p => p.id === s.psychologistId)?.name || "",
+              Data: formatDate(s.date),
+              Horário: s.time,
+              "Duração (min)": s.duration,
+              Status: statusLabels[s.status] || s.status,
+              Pagamento: paymentLabels[s.paymentStatus] || s.paymentStatus,
+              "Valor Esperado": s.expectedAmount,
+              "Valor Pago": s.paidAmount,
+              Observações: s.notes,
+            }));
+            exportToXlsx(data, "sessoes");
+            toast.success("Planilha exportada!");
+          }}><Download className="mr-2 h-4 w-4" />Exportar</Button>
 
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Nova Sessão</Button></DialogTrigger>
